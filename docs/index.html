@@ -1000,7 +1000,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 (function () {
   "use strict";
   const PDOK = "https://api.pdok.nl/bzk/locatieserver/search/v3_1/free";
-  const CACHE_SLEUTEL = "routeplanner-geocache-v1";
+  const CACHE_SLEUTEL = "routeplanner-geocache-v2"; // v2: oude, mogelijk foute treffers vergeten
   const OMRIJ = 1.35, KMH = 35;
 
   const leesCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_SLEUTEL)) || {}; } catch { return {}; } };
@@ -1016,22 +1016,24 @@ svg.leaflet-image-layer.leaflet-interactive path {
     const sleutel = `${pc}|${a.huisnummer}|${(a.toevoeging || "").toUpperCase()}`;
     if (cache[sleutel]) return cache[sleutel];
     const u = new URL(PDOK);
-    u.searchParams.set("q", `postcode:${pc} and huisnummer:${a.huisnummer}`);
-    u.searchParams.set("fq", "type:adres");
-    u.searchParams.set("rows", "10");
-    u.searchParams.set("fl", "weergavenaam,centroide_ll,huisletter,huisnummertoevoeging");
+    // Exacte filters (fq) i.p.v. een vrije zoekvraag: anders kan PDOK een ander huisnummer
+    // in dezelfde postcode teruggeven en vallen meerdere orders op hetzelfde punt.
+    u.searchParams.set("q", `${pc} ${a.huisnummer}`);
+    u.searchParams.append("fq", "type:adres");
+    u.searchParams.append("fq", `postcode:${pc}`);
+    u.searchParams.append("fq", `huisnummer:${a.huisnummer}`);
+    u.searchParams.set("rows", "20");
+    u.searchParams.set("fl", "weergavenaam,centroide_ll,postcode,huisnummer,huisletter,huisnummertoevoeging");
     let docs;
     try {
       const r = await fetch(u);
       if (!r.ok) throw new Error(r.status);
       docs = (await r.json()).response.docs;
     } catch (e) { throw new Error(`PDOK niet bereikbaar voor ${pc} ${a.huisnummer} (${e.message})`); }
+    docs = docs.filter(x => (x.postcode || pc).toUpperCase() === pc && +(x.huisnummer ?? a.huisnummer) === +a.huisnummer);
     if (!docs.length) throw new Error(`Adres niet gevonden: ${pc} ${a.huisnummer}${a.toevoeging || ""}`);
-    let d = docs[0];
-    if (a.toevoeging) {
-      const t = a.toevoeging.toUpperCase();
-      d = docs.find(x => (x.huisletter || "").toUpperCase() === t || (x.huisnummertoevoeging || "").toUpperCase() === t) || d;
-    }
+    const toev = x => ((x.huisletter || "") + (x.huisnummertoevoeging || "")).toUpperCase();
+    let d = docs.find(x => toev(x) === (a.toevoeging || "").toUpperCase().replace(/[-\s]/g, "")) || docs[0];
     const m = /POINT\(([-\d.]+) ([-\d.]+)\)/.exec(d.centroide_ll || "");
     if (!m) throw new Error(`Geen coördinaten voor ${pc} ${a.huisnummer}`);
     const res = [+m[2], +m[1], d.weergavenaam];
@@ -1215,8 +1217,8 @@ function melding(tekst, info = false) {
   $("meldingen").appendChild(div);
 }
 
-function nrIcoon(tekst, kleur) {
-  return L.divIcon({ className: "", html: `<div class="nr" style="background:${kleur}">${tekst}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+function nrIcoon(tekst, kleur, verschuif = 0) {
+  return L.divIcon({ className: "", html: `<div class="nr" style="background:${kleur}">${tekst}</div>`, iconSize: [24, 24], iconAnchor: [12 - verschuif * 18, 12] });
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
@@ -1235,7 +1237,9 @@ function googleMapsLink(stops) {
 function toon(res) {
   laag.clearLayers();
   $("resultaat").innerHTML = "";
-  const grenzen = [];
+  const grenzen = [], gezien = {};
+  const ingepland = res.routes.reduce((n, r) => n + r.stops.filter(s => s.order_id).length, 0);
+  melding(`${ingepland} van de ${ingepland + res.niet_ingepland.length} orders ingepland.`, true);
   res.routes.forEach((r, ri) => {
     const rk = ROUTEKLEUR[ri % ROUTEKLEUR.length];
     L.polyline(r.geometrie, { color: rk, weight: 5, opacity: .75 }).addTo(laag);
@@ -1243,7 +1247,10 @@ function toon(res) {
       grenzen.push([s.lat, s.lon]);
       const isStart = !s.order_id;
       if (isStart && si > 0) return;
-      const icoon = isStart ? nrIcoon("S", "#344054") : nrIcoon(s.volgorde, KLEUR[s.status]);
+      // Stops op exact hetzelfde adres (bijv. flat of verpleeghuis) iets uit elkaar zetten zodat ze allemaal zichtbaar zijn
+      const pos = `${s.lat.toFixed(5)},${s.lon.toFixed(5)}`;
+      const dubbel = (gezien[pos] = (gezien[pos] || 0) + 1) - 1;
+      const icoon = isStart ? nrIcoon("S", "#344054") : nrIcoon(s.volgorde, KLEUR[s.status], dubbel);
       L.marker([s.lat, s.lon], { icon: icoon }).addTo(laag)
         .bindPopup(`<b>${esc(s.label)}</b><br>${s.status ? s.status.toUpperCase() + " · " : ""}aankomst ${s.aankomst}`);
     });

@@ -45,16 +45,17 @@ _POINT = re.compile(r"POINT\(([-\d.]+) ([-\d.]+)\)")
 def geocode(postcode: str, huisnummer: int, toevoeging: str | None = None,
             client: httpx.Client | None = None) -> tuple[float, float, str]:
     """Geeft (lat, lon, weergavenaam) terug voor postcode + huisnummer."""
-    sleutel = f"{postcode}|{huisnummer}|{(toevoeging or '').upper()}"
+    sleutel = f"v2|{postcode}|{huisnummer}|{(toevoeging or '').upper()}"
     with _lock:
         cache = _laad_cache()
         if sleutel in cache:
             lat, lon, naam = cache[sleutel]
             return lat, lon, naam
 
-    q = f"postcode:{postcode} and huisnummer:{huisnummer}"
-    params = {"q": q, "fq": "type:adres", "rows": 10,
-              "fl": "weergavenaam,centroide_ll,huisletter,huisnummertoevoeging"}
+    # Exacte filters (fq): een vrije zoekvraag kan een ander huisnummer in dezelfde postcode opleveren
+    params = [("q", f"{postcode} {huisnummer}"), ("fq", "type:adres"), ("fq", f"postcode:{postcode}"),
+              ("fq", f"huisnummer:{huisnummer}"), ("rows", 20),
+              ("fl", "weergavenaam,centroide_ll,postcode,huisnummer,huisletter,huisnummertoevoeging")]
     eigen = client is None
     client = client or httpx.Client(timeout=10)
     try:
@@ -67,16 +68,15 @@ def geocode(postcode: str, huisnummer: int, toevoeging: str | None = None,
         if eigen:
             client.close()
 
+    docs = [d for d in docs if (d.get("postcode") or postcode).upper() == postcode
+            and int(d.get("huisnummer") or huisnummer) == huisnummer]
     if not docs:
         raise GeocodeFout(f"Adres niet gevonden: {postcode} {huisnummer}{toevoeging or ''}")
 
-    gekozen = docs[0]
-    if toevoeging:
-        t = toevoeging.upper()
-        for d in docs:
-            if (d.get("huisletter") or "").upper() == t or (d.get("huisnummertoevoeging") or "").upper() == t:
-                gekozen = d
-                break
+    def toev(d):
+        return ((d.get("huisletter") or "") + (d.get("huisnummertoevoeging") or "")).upper()
+    gewenst = (toevoeging or "").upper().replace("-", "").replace(" ", "")
+    gekozen = next((d for d in docs if toev(d) == gewenst), docs[0])
 
     m = _POINT.search(gekozen.get("centroide_ll", ""))
     if not m:

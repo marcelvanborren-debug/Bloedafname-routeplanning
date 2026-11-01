@@ -3,7 +3,7 @@
 (function () {
   "use strict";
   const PDOK = "https://api.pdok.nl/bzk/locatieserver/search/v3_1/free";
-  const CACHE_SLEUTEL = "routeplanner-geocache-v1";
+  const CACHE_SLEUTEL = "routeplanner-geocache-v2"; // v2: oude, mogelijk foute treffers vergeten
   const OMRIJ = 1.35, KMH = 35;
 
   const leesCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_SLEUTEL)) || {}; } catch { return {}; } };
@@ -19,22 +19,24 @@
     const sleutel = `${pc}|${a.huisnummer}|${(a.toevoeging || "").toUpperCase()}`;
     if (cache[sleutel]) return cache[sleutel];
     const u = new URL(PDOK);
-    u.searchParams.set("q", `postcode:${pc} and huisnummer:${a.huisnummer}`);
-    u.searchParams.set("fq", "type:adres");
-    u.searchParams.set("rows", "10");
-    u.searchParams.set("fl", "weergavenaam,centroide_ll,huisletter,huisnummertoevoeging");
+    // Exacte filters (fq) i.p.v. een vrije zoekvraag: anders kan PDOK een ander huisnummer
+    // in dezelfde postcode teruggeven en vallen meerdere orders op hetzelfde punt.
+    u.searchParams.set("q", `${pc} ${a.huisnummer}`);
+    u.searchParams.append("fq", "type:adres");
+    u.searchParams.append("fq", `postcode:${pc}`);
+    u.searchParams.append("fq", `huisnummer:${a.huisnummer}`);
+    u.searchParams.set("rows", "20");
+    u.searchParams.set("fl", "weergavenaam,centroide_ll,postcode,huisnummer,huisletter,huisnummertoevoeging");
     let docs;
     try {
       const r = await fetch(u);
       if (!r.ok) throw new Error(r.status);
       docs = (await r.json()).response.docs;
     } catch (e) { throw new Error(`PDOK niet bereikbaar voor ${pc} ${a.huisnummer} (${e.message})`); }
+    docs = docs.filter(x => (x.postcode || pc).toUpperCase() === pc && +(x.huisnummer ?? a.huisnummer) === +a.huisnummer);
     if (!docs.length) throw new Error(`Adres niet gevonden: ${pc} ${a.huisnummer}${a.toevoeging || ""}`);
-    let d = docs[0];
-    if (a.toevoeging) {
-      const t = a.toevoeging.toUpperCase();
-      d = docs.find(x => (x.huisletter || "").toUpperCase() === t || (x.huisnummertoevoeging || "").toUpperCase() === t) || d;
-    }
+    const toev = x => ((x.huisletter || "") + (x.huisnummertoevoeging || "")).toUpperCase();
+    let d = docs.find(x => toev(x) === (a.toevoeging || "").toUpperCase().replace(/[-\s]/g, "")) || docs[0];
     const m = /POINT\(([-\d.]+) ([-\d.]+)\)/.exec(d.centroide_ll || "");
     if (!m) throw new Error(`Geen coördinaten voor ${pc} ${a.huisnummer}`);
     const res = [+m[2], +m[1], d.weergavenaam];

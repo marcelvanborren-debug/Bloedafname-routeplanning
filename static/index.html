@@ -123,8 +123,8 @@ function melding(tekst, info = false) {
   $("meldingen").appendChild(div);
 }
 
-function nrIcoon(tekst, kleur) {
-  return L.divIcon({ className: "", html: `<div class="nr" style="background:${kleur}">${tekst}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+function nrIcoon(tekst, kleur, verschuif = 0) {
+  return L.divIcon({ className: "", html: `<div class="nr" style="background:${kleur}">${tekst}</div>`, iconSize: [24, 24], iconAnchor: [12 - verschuif * 18, 12] });
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
@@ -143,7 +143,9 @@ function googleMapsLink(stops) {
 function toon(res) {
   laag.clearLayers();
   $("resultaat").innerHTML = "";
-  const grenzen = [];
+  const grenzen = [], gezien = {};
+  const ingepland = res.routes.reduce((n, r) => n + r.stops.filter(s => s.order_id).length, 0);
+  melding(`${ingepland} van de ${ingepland + res.niet_ingepland.length} orders ingepland.`, true);
   res.routes.forEach((r, ri) => {
     const rk = ROUTEKLEUR[ri % ROUTEKLEUR.length];
     L.polyline(r.geometrie, { color: rk, weight: 5, opacity: .75 }).addTo(laag);
@@ -151,7 +153,10 @@ function toon(res) {
       grenzen.push([s.lat, s.lon]);
       const isStart = !s.order_id;
       if (isStart && si > 0) return;
-      const icoon = isStart ? nrIcoon("S", "#344054") : nrIcoon(s.volgorde, KLEUR[s.status]);
+      // Stops op exact hetzelfde adres (bijv. flat of verpleeghuis) iets uit elkaar zetten zodat ze allemaal zichtbaar zijn
+      const pos = `${s.lat.toFixed(5)},${s.lon.toFixed(5)}`;
+      const dubbel = (gezien[pos] = (gezien[pos] || 0) + 1) - 1;
+      const icoon = isStart ? nrIcoon("S", "#344054") : nrIcoon(s.volgorde, KLEUR[s.status], dubbel);
       L.marker([s.lat, s.lon], { icon: icoon }).addTo(laag)
         .bindPopup(`<b>${esc(s.label)}</b><br>${s.status ? s.status.toUpperCase() + " · " : ""}aankomst ${s.aankomst}`);
     });
