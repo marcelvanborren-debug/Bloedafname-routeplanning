@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Routeplanner bloedafname</title>
+<link rel="stylesheet" href="/static/leaflet/leaflet.css">
+<script src="/static/leaflet/leaflet.js"></script>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --tekst:#1d2430; --zacht:#667085; --rand:#e3e6ea;
+          --cito:#d92d20; --nuchter:#f79009; --normaal:#1570ef; --start:#344054; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--tekst); }
+  header { padding:12px 16px; background:#0b3b60; color:#fff; display:flex; align-items:center; gap:12px; }
+  header h1 { font-size:18px; margin:0; font-weight:600; }
+  main { display:grid; grid-template-columns: 420px 1fr; height: calc(100vh - 48px); }
+  aside { overflow:auto; padding:16px; border-right:1px solid var(--rand); background:var(--card); }
+  #kaart { height:100%; }
+  label { display:block; font-size:13px; color:var(--zacht); margin:10px 0 4px; }
+  input, textarea, select { width:100%; padding:8px; border:1px solid var(--rand); border-radius:6px; font:inherit; font-size:14px; }
+  textarea { height:180px; font-family: ui-monospace, Menlo, monospace; font-size:13px; }
+  .rij { display:flex; gap:8px; } .rij > * { flex:1; }
+  button { margin-top:12px; width:100%; padding:10px; border:0; border-radius:6px; background:#0b3b60; color:#fff; font-size:15px; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:wait; }
+  details { margin-top:10px; } summary { cursor:pointer; font-size:13px; color:var(--zacht); }
+  .hint { font-size:12px; color:var(--zacht); margin-top:4px; }
+  .melding { margin-top:12px; padding:8px 10px; border-radius:6px; font-size:13px; background:#fef3f2; color:#912018; }
+  .melding.info { background:#eff8ff; color:#175cd3; }
+  .route { margin-top:16px; border:1px solid var(--rand); border-radius:8px; overflow:hidden; }
+  .route h3 { margin:0; padding:8px 10px; font-size:14px; display:flex; justify-content:space-between; align-items:center; }
+  .route table { width:100%; border-collapse:collapse; font-size:13px; }
+  .route td { padding:6px 8px; border-top:1px solid var(--rand); vertical-align:top; }
+  .badge { display:inline-block; padding:1px 6px; border-radius:10px; font-size:11px; color:#fff; text-transform:uppercase; }
+  .b-cito { background:var(--cito); } .b-nuchter { background:var(--nuchter); } .b-normaal { background:var(--normaal); }
+  .nr { display:flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; color:#fff; font-size:12px; font-weight:700; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.4); }
+  a.gm { font-size:12px; color:#175cd3; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; height:auto; } #kaart { height:60vh; } aside { border-right:0; } }
+</style>
+</head>
+<body>
+<header><h1>Routeplanner bloedafname</h1></header>
+<main>
+<aside>
+  <label>Startlocatie (postcode + huisnummer)</label>
+  <div class="rij"><input id="startPc" placeholder="3584CX" value="3584CX"><input id="startNr" placeholder="100" value="100" style="max-width:90px"></div>
+
+  <div class="rij">
+    <div><label>Vertrek</label><input id="starttijd" type="time" value="07:00"></div>
+    <div><label>Einde dienst</label><input id="eindtijd" type="time" value="13:00"></div>
+    <div><label>Medewerkers</label><input id="medewerkers" type="number" min="1" max="50" value="1"></div>
+  </div>
+
+  <label>Orders — één per regel: <code>postcode; huisnummer[-toev]; status; duur(min); naam</code></label>
+  <textarea id="orders">3581AB; 10; cito; 10; Dhr. Jansen
+3572KR; 5; nuchter; 10; Mw. de Vries
+3523BC; 44; normaal; 10
+3531TS; 2-A; nuchter; 15; Mw. Bakker
+3584AB; 1; normaal; 10
+3511LX; 7; normaal; 10</textarea>
+  <div class="hint">Status: <b>cito</b>, <b>nuchter</b> of <b>normaal</b>. Optioneel tijdvenster: voeg <code>; 09:00-10:30</code> toe. Ook CSV/Excel-plak (tab of komma) werkt.</div>
+
+  <details>
+    <summary>Prioriteiten en instellingen</summary>
+    <div class="rij">
+      <div><label>Nuchter uiterlijk</label><input id="nuchterUiterlijk" type="time" value="10:00"></div>
+      <div><label>CITO binnen (min)</label><input id="citoBinnen" type="number" value="60"></div>
+    </div>
+    <div class="rij">
+      <div><label>Gewicht CITO</label><input id="wCito" type="number" min="0" value="20"></div>
+      <div><label>Gewicht nuchter</label><input id="wNuchter" type="number" min="0" value="5"></div>
+      <div><label>Gewicht normaal</label><input id="wNormaal" type="number" min="0" value="0"></div>
+    </div>
+    <div class="hint">Gewicht = hoeveel minuten extra rijden één minuut eerder bij deze patiënt waard is.</div>
+    <div class="rij">
+      <div><label>Terug naar start</label><select id="terug"><option value="1">Ja</option><option value="0">Nee</option></select></div>
+      <div><label>Rekentijd (sec)</label><input id="rekentijd" type="number" min="1" max="60" value="5"></div>
+    </div>
+  </details>
+
+  <button id="plan">Plan optimale route</button>
+  <div id="meldingen"></div>
+  <div id="resultaat"></div>
+</aside>
+<div id="kaart"></div>
+</main>
+
+<script>
+const KLEUR = { cito: "#d92d20", nuchter: "#f79009", normaal: "#1570ef" };
+const ROUTEKLEUR = ["#0b3b60", "#7a5af8", "#039855", "#c11574", "#b54708", "#0e9384"];
+const $ = id => document.getElementById(id);
+
+const kaart = L.map("kaart").setView([52.1, 5.3], 8);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, attribution: "&copy; OpenStreetMap-bijdragers"
+}).addTo(kaart);
+const laag = L.layerGroup().addTo(kaart);
+
+function parseOrders(tekst) {
+  const orders = [], fouten = [];
+  tekst.split(/\r?\n/).forEach((regel, i) => {
+    regel = regel.trim();
+    if (!regel || regel.startsWith("#")) return;
+    const d = regel.split(/[;\t,]/).map(s => s.trim());
+    if (/^postcode$/i.test(d[0])) return; // kopregel
+    const nrDelen = (d[1] || "").match(/^(\d+)\s*[- ]?\s*([A-Za-z0-9]*)$/);
+    if (!d[0] || !nrDelen) { fouten.push(`Regel ${i + 1}: postcode/huisnummer onleesbaar`); return; }
+    const status = (d[2] || "normaal").toLowerCase();
+    if (!["cito", "nuchter", "normaal"].includes(status)) { fouten.push(`Regel ${i + 1}: onbekende status "${d[2]}"`); return; }
+    const o = { id: `O${orders.length + 1}`, postcode: d[0], huisnummer: +nrDelen[1],
+                toevoeging: nrDelen[2] || null, status, duur_min: +(d[3] || 10) || 10, patient: d[4] || null };
+    const venster = d.slice(3).find(x => /^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$/.test(x));
+    if (venster) { const [a, b] = venster.split("-").map(s => s.trim().padStart(5, "0")); o.vanaf = a; o.uiterlijk = b;
+                   if (d[3] === venster) o.duur_min = 10; if (d[4] === venster) o.patient = null; }
+    orders.push(o);
+  });
+  return { orders, fouten };
+}
+
+function melding(tekst, info = false) {
+  const div = document.createElement("div");
+  div.className = "melding" + (info ? " info" : "");
+  div.textContent = tekst;
+  $("meldingen").appendChild(div);
+}
+
+function nrIcoon(tekst, kleur) {
+  return L.divIcon({ className: "", html: `<div class="nr" style="background:${kleur}">${tekst}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function googleMapsLink(stops) {
+  const pts = stops.map(s => `${s.lat},${s.lon}`);
+  const u = new URL("https://www.google.com/maps/dir/");
+  u.searchParams.set("api", "1");
+  u.searchParams.set("origin", pts[0]);
+  u.searchParams.set("destination", pts[pts.length - 1]);
+  if (pts.length > 2) u.searchParams.set("waypoints", pts.slice(1, -1).join("|"));
+  u.searchParams.set("travelmode", "driving");
+  return u.toString();
+}
+
+function toon(res) {
+  laag.clearLayers();
+  $("resultaat").innerHTML = "";
+  const grenzen = [];
+  res.routes.forEach((r, ri) => {
+    const rk = ROUTEKLEUR[ri % ROUTEKLEUR.length];
+    L.polyline(r.geometrie, { color: rk, weight: 5, opacity: .75 }).addTo(laag);
+    r.stops.forEach((s, si) => {
+      grenzen.push([s.lat, s.lon]);
+      const isStart = !s.order_id;
+      if (isStart && si > 0) return;
+      const icoon = isStart ? nrIcoon("S", "#344054") : nrIcoon(s.volgorde, KLEUR[s.status]);
+      L.marker([s.lat, s.lon], { icon: icoon }).addTo(laag)
+        .bindPopup(`<b>${esc(s.label)}</b><br>${s.status ? s.status.toUpperCase() + " · " : ""}aankomst ${s.aankomst}`);
+    });
+    const rijen = r.stops.map(s => `<tr>
+      <td>${s.order_id ? s.volgorde : "S"}</td>
+      <td>${s.aankomst}${s.order_id ? "–" + s.vertrek : ""}</td>
+      <td>${s.status ? `<span class="badge b-${s.status}">${s.status}</span> ` : ""}${esc(s.label)}</td>
+      <td style="white-space:nowrap">${s.reistijd_min ? s.reistijd_min.toFixed(0) + " min" : ""}</td></tr>`).join("");
+    const kaartje = document.createElement("div");
+    kaartje.className = "route";
+    kaartje.innerHTML = `<h3 style="border-left:6px solid ${rk}">Medewerker ${r.medewerker}
+        <span style="font-weight:400;font-size:12px">${r.totaal_afstand_km} km · ${r.totaal_reistijd_min.toFixed(0)} min rijden · klaar ${r.eindtijd}</span></h3>
+      <table>${rijen}</table>
+      <div style="padding:6px 8px"><a class="gm" target="_blank" rel="noopener" href="${googleMapsLink(r.stops)}">Open in Google Maps</a></div>`;
+    $("resultaat").appendChild(kaartje);
+  });
+  if (grenzen.length) kaart.fitBounds(grenzen, { padding: [30, 30] });
+  res.niet_ingepland.forEach(n => melding(`Niet ingepland: ${n.order_id} (${n.status}) – ${n.reden}`));
+  res.waarschuwingen.forEach(w => melding(w));
+  melding(`Reistijden: ${res.reistijdbron}`, true);
+}
+
+$("plan").addEventListener("click", async () => {
+  $("meldingen").innerHTML = "";
+  const { orders, fouten } = parseOrders($("orders").value);
+  fouten.forEach(f => melding(f));
+  if (fouten.length || !orders.length) { if (!orders.length) melding("Voer minstens één order in."); return; }
+  const start = $("startNr").value.trim().match(/^(\d+)\s*[- ]?\s*([A-Za-z0-9]*)$/);
+  if (!start) { melding("Startadres: huisnummer onleesbaar"); return; }
+  const body = {
+    start: { postcode: $("startPc").value, huisnummer: +start[1], toevoeging: start[2] || null },
+    orders, medewerkers: +$("medewerkers").value || 1,
+    instellingen: {
+      starttijd: $("starttijd").value, eindtijd: $("eindtijd").value,
+      nuchter_uiterlijk: $("nuchterUiterlijk").value, cito_binnen_min: +$("citoBinnen").value,
+      gewicht_cito: +$("wCito").value, gewicht_nuchter: +$("wNuchter").value, gewicht_normaal: +$("wNormaal").value,
+      terug_naar_start: $("terug").value === "1", rekentijd_sec: +$("rekentijd").value || 5,
+    },
+  };
+  const knop = $("plan"); knop.disabled = true; knop.textContent = "Bezig met optimaliseren…";
+  try {
+    const r = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) {
+      const d = data.detail;
+      if (d && d.fouten) d.fouten.forEach(f => melding(f));
+      else if (Array.isArray(d)) d.forEach(e => melding(`${e.loc.join(".")}: ${e.msg}`));
+      else melding(typeof d === "string" ? d : "Er ging iets mis");
+      return;
+    }
+    toon(data);
+  } catch (e) {
+    melding("Server niet bereikbaar: " + e.message);
+  } finally {
+    knop.disabled = false; knop.textContent = "Plan optimale route";
+  }
+});
+</script>
+</body>
+</html>

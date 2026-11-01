@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+geocode_cache.json
+data/
+osrm/
+.venv/

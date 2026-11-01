@@ -1,0 +1,14 @@
+# Volledige stack met eigen OSRM-server (Nederland) voor snelle, privacyvriendelijke reistijden.
+# Eerst de kaartdata voorbereiden (eenmalig, ~10 min):  ./osrm-voorbereiden.sh
+services:
+  app:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      OSRM_URL: http://osrm:5000
+    volumes: ["./data:/data"]
+    depends_on: [osrm]
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    command: osrm-routed --algorithm mld --max-table-size 1000 /osrm/netherlands-latest.osrm
+    volumes: ["./osrm:/osrm"]
