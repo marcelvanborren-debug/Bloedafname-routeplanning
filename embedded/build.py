@@ -42,6 +42,24 @@ $("csv").addEventListener("change", async e => {
 const BEWAAR = ["startPc","startNr","starttijd","eindtijd","medewerkers","orders","nuchterUiterlijk","citoBinnen","wCito","wNuchter","wNormaal","terug","rekentijd","osrmUrl"];
 try { const b = JSON.parse(localStorage.getItem("routeplanner-invoer") || "{}"); BEWAAR.forEach(id => { if (b[id] != null) $(id).value = b[id]; }); } catch {}
 document.addEventListener("input", () => { try { localStorage.setItem("routeplanner-invoer", JSON.stringify(Object.fromEntries(BEWAAR.map(id => [id, $(id).value])))); } catch {} });
+// Orders uit de ordermodule: #orders=<base64url, UTF-8>&start=<postcode>-<huisnummer>&medewerkers=<n>
+// De gegevens staan in de hash, dus ze gaan niet naar de webserver; na inlezen wordt de hash gewist.
+(function () {
+  const h = new URLSearchParams(location.hash.slice(1)), b64 = h.get("orders");
+  if (!b64) return;
+  try {
+    const bin = atob(b64.replace(/-/g, "+").replace(/_/g, "/"));
+    const tekst = new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))).trim();
+    $("orders").value = tekst;
+    const st = (h.get("start") || "").match(/^(\\d{4}\\s?[A-Za-z]{2})-(.+)$/);
+    if (st) { $("startPc").value = st[1]; $("startNr").value = st[2]; }
+    const mw = parseInt(h.get("medewerkers"), 10); if (mw > 0) $("medewerkers").value = Math.min(mw, 50);
+    document.dispatchEvent(new Event("input"));
+    const n = tekst.split(/\\r?\\n/).filter(r => r.trim() && !/^postcode/i.test(r.trim())).length;
+    melding(`${n} orders ontvangen uit de ordermodule. Controleer startadres en medewerkers en klik op "Plan optimale route".`, true);
+  } catch (e) { melding("De orders in de link konden niet worden gelezen: " + e.message); }
+  history.replaceState(null, "", location.pathname + location.search);
+})();
 </script>'''
 i = s.rindex('</script>')
 s = s[:i] + extra + s[i + len('</script>'):]
