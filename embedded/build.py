@@ -21,6 +21,8 @@ vervang('''    <div class="rij">
     <div class="hint">Standaard de publieke OSRM-demoserver. Voor productie: eigen OSRM-server.</div>
     <div class="rij">
       <div><label>Terug naar start</label>''')
+vervang('''  <label>Orders — één per regel''', '''  <button id="testset" type="button" style="background:#fff;color:#0b3b60;border:1px solid #0b3b60;margin:14px 0 0">Testset: 300 echte adressen Ede, Arnhem, Nijmegen</button>
+  <label>Orders — één per regel''')
 vervang('''  <div class="hint">Status: <b>cito</b>''', '''  <label class="hint" style="margin-top:6px">Of laad een CSV-bestand: <input id="csv" type="file" accept=".csv,.txt" style="padding:2px;border:0"></label>
   <div class="hint">Status: <b>cito</b>''')
 
@@ -35,6 +37,18 @@ s = s[:begin] + '''  try {
 ''' + s[eind:]
 
 extra = '''
+$("testset").addEventListener("click", async () => {
+  const knop = $("testset"); knop.disabled = true; $("meldingen").innerHTML = "";
+  try {
+    const regels = await genereerTestset(300, ["Ede", "Arnhem", "Nijmegen"], t => knop.textContent = t);
+    $("orders").value = regels.join("\\n");
+    $("startPc").value = "6815AD"; $("startNr").value = "55";  // Rijnstate Arnhem als vertrekpunt
+    $("medewerkers").value = 15; $("rekentijd").value = 15;
+    document.dispatchEvent(new Event("input"));
+    melding(`${regels.length} bestaande adressen opgehaald (5% cito, 25% nuchter). Start: Rijnstate Arnhem, 15 medewerkers, 15 s rekentijd. Klik op "Plan optimale route".`, true);
+  } catch (e) { melding("Testset ophalen mislukt: " + e.message); }
+  finally { knop.disabled = false; knop.textContent = "Testset: 300 echte adressen Ede, Arnhem, Nijmegen"; }
+});
 $("csv").addEventListener("change", async e => {
   const f = e.target.files[0]; if (f) $("orders").value = (await f.text()).trim();
 });

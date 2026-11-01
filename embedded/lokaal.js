@@ -64,16 +64,53 @@
     return { dur, dist };
   }
 
-  async function osrmMatrix(coords, osrm) {
-    const loc = coords.map(([la, lo]) => `${lo.toFixed(6)},${la.toFixed(6)}`).join(";");
-    const r = await fetch(`${osrm}/table/v1/driving/${loc}?annotations=duration,distance`);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const d = await r.json();
-    if (d.code !== "Ok") throw new Error(d.message || d.code);
-    return {
-      dur: d.durations.map((row, i) => row.map((x, j) => Math.round(x || 0) + (i !== j ? 60 : 0))),
-      dist: d.distances.map(row => row.map(x => Math.round(x || 0))),
-    };
+  // Voert fn uit over items met maximaal n tegelijk (netjes voor PDOK en OSRM)
+  async function pool(items, n, fn) {
+    const uit = new Array(items.length);
+    let i = 0;
+    await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+      while (i < items.length) {
+        const k = i++;
+        try { uit[k] = { ok: true, waarde: await fn(items[k], k) }; }
+        catch (e) { uit[k] = { ok: false, fout: e }; }
+      }
+    }));
+    return uit;
+  }
+
+  // OSRM-tabel in blokken: de publieke server accepteert max. 100 coördinaten per verzoek
+  async function osrmMatrix(coords, osrm, voortgang = () => {}) {
+    const n = coords.length, B = 50;
+    const dur = Array.from({ length: n }, () => new Array(n).fill(0));
+    const dist = Array.from({ length: n }, () => new Array(n).fill(0));
+    const blokken = [];
+    for (let a = 0; a < n; a += B) for (let b = 0; b < n; b += B) blokken.push([a, b]);
+    let klaar = 0;
+    const res = await pool(blokken, 2, async ([a, b]) => {
+      const src = coords.slice(a, a + B), dst = coords.slice(b, b + B);
+      const alle = a === b ? src : src.concat(dst);
+      const loc = alle.map(([la, lo]) => `${lo.toFixed(6)},${la.toFixed(6)}`).join(";");
+      const si = src.map((_, i) => i).join(";");
+      const di = dst.map((_, j) => (a === b ? j : src.length + j)).join(";");
+      let r;
+      for (let poging = 0; poging < 3; poging++) {
+        r = await fetch(`${osrm}/table/v1/driving/${loc}?sources=${si}&destinations=${di}&annotations=duration,distance`);
+        if (r.status !== 429) break;
+        await new Promise(ok => setTimeout(ok, 1000 * (poging + 1)));
+      }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (d.code !== "Ok") throw new Error(d.message || d.code);
+      d.durations.forEach((row, i) => row.forEach((x, j) => {
+        const I = a + i, J = b + j;
+        dur[I][J] = I === J ? 0 : Math.round(x || 0) + 60;
+        dist[I][J] = Math.round(d.distances[i][j] || 0);
+      }));
+      voortgang(`Reistijden berekenen… ${++klaar}/${blokken.length}`);
+    });
+    const fout = res.find(x => !x.ok);
+    if (fout) throw fout.fout;
+    return { dur, dist };
   }
 
   async function geometrie(coords, osrm) {
@@ -102,6 +139,50 @@
     }
   }
 
+  // Testset: willekeurige BESTAANDE adressen uit de BAG via PDOK
+  window.genereerTestset = async function (aantal = 300, plaatsen = ["Ede", "Arnhem", "Nijmegen"], voortgang = () => {}) {
+    const zoek = async (plaats, start, rows) => {
+      const u = new URL(PDOK);
+      u.searchParams.set("q", "*:*");
+      u.searchParams.append("fq", "type:adres");
+      u.searchParams.append("fq", `woonplaatsnaam:${plaats}`);
+      u.searchParams.set("rows", String(rows));
+      u.searchParams.set("start", String(start));
+      u.searchParams.set("fl", "postcode,huisnummer,huisletter,huisnummertoevoeging");
+      const r = await fetch(u);
+      if (!r.ok) throw new Error(`PDOK HTTP ${r.status}`);
+      return (await r.json()).response;
+    };
+    const totalen = await Promise.all(plaatsen.map(p => zoek(p, 0, 0).then(r => r.numFound)));
+    // Om en om per plaats, met 10% extra zodat er na ontdubbelen genoeg overblijven
+    const taken = [];
+    const extra = Math.ceil(aantal * 1.1);
+    for (let k = 0; k < extra; k++) {
+      const i = k % plaatsen.length;
+      taken.push([plaatsen[i], Math.floor(Math.random() * Math.max(1, totalen[i] - 1))]);
+    }
+    let klaar = 0;
+    const res = await pool(taken, 6, async ([p, start]) => {
+      const d = (await zoek(p, start, 1)).docs[0];
+      if (++klaar % 20 === 0) voortgang(`Testadressen ophalen… ${klaar}/${taken.length}`);
+      return d;
+    });
+    const gezien = new Set();
+    const regels = [];
+    for (const x of res) {
+      if (!x.ok || !x.waarde || !x.waarde.postcode) continue;
+      const d = x.waarde;
+      const toev = (d.huisletter || "") + (d.huisnummertoevoeging ? (d.huisletter ? "" : "") + d.huisnummertoevoeging : "");
+      const sleutel = `${d.postcode}|${d.huisnummer}|${toev}`;
+      if (gezien.has(sleutel)) continue;
+      gezien.add(sleutel);
+      const r = Math.random();
+      const status = r < 0.05 ? "cito" : r < 0.30 ? "nuchter" : "normaal";
+      regels.push(`${d.postcode}; ${d.huisnummer}${toev ? "-" + toev : ""}; ${status}; 10`);
+    }
+    return regels.slice(0, aantal);
+  };
+
   window.planLokaal = async function (req, osrmUrl, voortgang = () => {}) {
     const ins = req.instellingen;
     const t0 = min(ins.starttijd);
@@ -111,16 +192,31 @@
     voortgang("Adressen opzoeken bij PDOK…");
     const cache = leesCache();
     const adressen = [req.start, ...req.orders];
-    const uitkomst = await Promise.allSettled(adressen.map(a => geocode(a, cache)));
+    let gedaan = 0;
+    const uitkomst = await pool(adressen, 6, async a => {
+      const r = await geocode(a, cache);
+      if (++gedaan % 10 === 0) voortgang(`Adressen opzoeken bij PDOK… ${gedaan}/${adressen.length}`);
+      return r;
+    });
     schrijfCache(cache);
-    const fouten = uitkomst.filter(u => u.status === "rejected").map(u => u.reason.message);
-    if (fouten.length) return { fouten };
-    const coords = uitkomst.map(u => [u.value[0], u.value[1]]);
-    const namen = uitkomst.map(u => u.value[2]);
+    if (!uitkomst[0].ok) return { fouten: ["Startadres: " + uitkomst[0].fout.message] };
+    // Niet gevonden orders overslaan en melden, de rest gewoon plannen
+    const nietGevonden = [];
+    const gevonden = [uitkomst[0].waarde];
+    const orders = [];
+    req.orders.forEach((o, i) => {
+      const u = uitkomst[i + 1];
+      if (u.ok) { orders.push(o); gevonden.push(u.waarde); }
+      else nietGevonden.push({ order_id: o.id, status: o.status, reden: u.fout.message });
+    });
+    if (!orders.length) return { fouten: nietGevonden.map(n => n.reden) };
+    req = { ...req, orders };
+    const coords = gevonden.map(v => [v[0], v[1]]);
+    const namen = gevonden.map(v => v[2]);
 
     voortgang("Reistijden berekenen…");
     let dur, dist, bron;
-    try { ({ dur, dist } = await osrmMatrix(coords, osrm)); bron = `OSRM (${osrm})`; }
+    try { ({ dur, dist } = await osrmMatrix(coords, osrm, voortgang)); bron = `OSRM (${osrm})`; }
     catch (e) {
       ({ dur, dist } = schatting(coords));
       bron = `schatting hemelsbreed ×${OMRIJ} @ ${KMH} km/u (OSRM niet bereikbaar: ${e.message})`;
@@ -175,7 +271,7 @@
       routes.push({ medewerker: v + 1, stops, totaal_reistijd_min: Math.round(totT * 10) / 10, totaal_afstand_km: Math.round(totD * 10) / 10,
                     eindtijd: stops[stops.length - 1].vertrek, geometrie: await geometrie(stops.map(s => [s.lat, s.lon]), osrm) });
     }
-    const niet_ingepland = res.vervallen.map(k => ({ order_id: req.orders[k - 1].id, status: req.orders[k - 1].status, reden: "past niet binnen werktijd/tijdvensters" }));
+    const niet_ingepland = nietGevonden.concat(res.vervallen.map(k => ({ order_id: req.orders[k - 1].id, status: req.orders[k - 1].status, reden: "past niet binnen werktijd/tijdvensters" })));
     if (niet_ingepland.length) waarschuwingen.push(`${niet_ingepland.length} order(s) konden niet worden ingepland.`);
     return { routes, niet_ingepland, reistijdbron: bron + ` · ${res.iteraties.toLocaleString("nl-NL")} iteraties`, waarschuwingen };
   };

@@ -153,10 +153,10 @@
   }
 
   // Lokale verbetering: 2-opt binnen routes en relocate tussen routes (first improvement)
-  function polijst(sol) {
+  function polijst(sol, deadline = Infinity) {
     const p = sol.p;
     let verbeterd = true;
-    while (verbeterd) {
+    while (verbeterd && Date.now() < deadline) {
       verbeterd = false;
       for (let v = 0; v < sol.routes.length; v++) {
         const r = sol.routes[v];
@@ -202,17 +202,18 @@
     const rng = maakRng(opties.seed ?? 12345);
     const n = p.orders.length;
     let sol = new Oplossing(p, Array.from({ length: p.medewerkers }, () => []), []);
+    const start = Date.now();
     voegIn(sol, Array.from({ length: n }, (_, i) => i + 1), rng, 0);
-    polijst(sol);
+    polijst(sol, start + tijdMs * 0.2);
     let huidig = sol, beste = sol.kloon();
     let huidigK = huidig.totaal(), besteK = huidigK;
     // Starttemperatuur op basis van de schaal van de rijtijden
     const gemReis = p.dur.flat().reduce((a, b) => a + b, 0) / Math.max(1, p.dur.length ** 2);
     const T0 = Math.max(1, gemReis * 2), T1 = 1;
-    const start = Date.now();
+    const zoekTijd = tijdMs * 0.85;
     let iter = 0;
     if (n > 1) while (true) {
-      const verstreken = (Date.now() - start) / tijdMs;
+      const verstreken = (Date.now() - start) / zoekTijd;
       if (verstreken >= 1) break;
       const T = T0 * Math.pow(T1 / T0, verstreken);
       const kand = huidig.kloon();
@@ -223,7 +224,7 @@
       if (k < besteK - 1e-9) { beste = kand.kloon(); besteK = k; }
       iter++;
     }
-    polijst(beste);
+    polijst(beste, start + tijdMs * 1.1);
     return {
       routes: beste.routes,
       vervallen: beste.vervallen.sort((a, b) => a - b),
