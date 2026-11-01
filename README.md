@@ -86,6 +86,12 @@ postcode; huisnummer[-toevoeging]; status; duur(min); naam; [tijdvenster]
 
 Of rechtstreeks via de API: `POST /api/plan` (zie `/docs` voor het schema).
 
+### Doorsturen vanuit de ordermodule
+
+De losse HTML-versie leest orders ook uit de link: `index.html#orders=<base64url>&start=<postcode>-<huisnummer>&medewerkers=<n>`.
+`orders` is de invoertekst hierboven (UTF-8, base64url). De gegevens staan in de hash, gaan dus niet naar de webserver,
+en de hash wordt na het inlezen gewist.
+
 ## Tests
 
 ```bash
