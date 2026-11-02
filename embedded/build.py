@@ -81,6 +81,14 @@ s = s[:i] + extra + s[i + len('</script>'):]
 solver = (E / 'solver.js').read_text()
 lokaal = (E / 'lokaal.js').read_text()
 vervang('<script>\nconst KLEUR', f'<script id="solver-src">{solver}</script>\n<script>{lokaal}</script>\n<script>\nconst KLEUR')
-vervang('<header><h1>Routeplanner bloedafname</h1></header>', '<header><h1>Routeplanner bloedafname</h1><span style="font-size:12px;opacity:.75">PDOK · OSRM · optimalisatie in de browser</span></header>')
+vervang('<header><h1>Routeplanner bloedafname</h1></header>', '<header><h1>Routeplanner bloedafname</h1><span style="font-size:12px;opacity:.75">PDOK · OSRM · optimalisatie in de browser</span><a href="kliniek.html" style="color:#fff;opacity:.8;font-size:13px;margin-left:auto">Prikken in kliniek</a></header>')
 out = E.parent / 'docs' / 'index.html'; out.write_text(s)
 print(out, len(s) // 1024, 'KB')
+
+# Module "Prikken in kliniek": één zelfstandig bestand, geen server of externe diensten nodig
+k = (E / 'kliniek.html').read_text()
+src = '<script src="kliniek.js"></script>'
+assert k.count(src) == 1
+k = k.replace(src, '<script>' + (E / 'kliniek.js').read_text().replace('</script', '<\\/script') + '</script>')
+out = E.parent / 'docs' / 'kliniek.html'; out.write_text(k)
+print(out, len(k) // 1024, 'KB')

@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Prikken in kliniek</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%236d5efc'/><path d='M8 25V12l8-5 8 5v13M13 25v-6h6v6M16 12v4M14 14h4' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<style>
+/* LIS look & feel: zelfde tokens als de LIS-shell en de andere modules */
+:root {
+  --bg: #f4f5fb; --surface: rgba(255,255,255,.72); --surface-solid: #fff; --sunken: rgba(109,94,252,.05);
+  --border: rgba(20,22,50,.08); --border-strong: rgba(20,22,50,.16);
+  --text: #15172b; --muted: #6a6f8c;
+  --accent: #6d5efc; --accent-2: #19c3b1; --accent-soft: rgba(109,94,252,.12);
+  --ok: #12a37f; --ok-soft: rgba(18,163,127,.12); --warn: #e08a00; --warn-soft: rgba(224,138,0,.14);
+  --danger: #e5484d; --danger-soft: rgba(229,72,77,.12); --arm: #8e4ec6; --arm-soft: rgba(142,78,198,.13);
+  --shadow: 0 1px 2px rgba(20,22,50,.04), 0 8px 24px rgba(20,22,50,.06);
+  --radius: 18px; --ease: cubic-bezier(.2,.8,.2,1);
+  font-family: ui-sans-serif, "Inter", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0d18; --surface: rgba(24,26,44,.66); --surface-solid: #171929; --sunken: rgba(139,127,255,.07);
+    --border: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.16); --text: #eceefe; --muted: #9196b8;
+    --accent: #8b7fff; --accent-soft: rgba(139,127,255,.16); --arm: #b48cf2; --arm-soft: rgba(180,140,242,.16);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c0d18; --surface: rgba(24,26,44,.66); --surface-solid: #171929; --sunken: rgba(139,127,255,.07);
+  --border: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.16); --text: #eceefe; --muted: #9196b8;
+  --accent: #8b7fff; --accent-soft: rgba(139,127,255,.16); --arm: #b48cf2; --arm-soft: rgba(180,140,242,.16);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; line-height: 1.45; font-size: 14px;
+  background: radial-gradient(1200px 600px at 0% -10%, rgba(109,94,252,.16), transparent 60%), radial-gradient(900px 500px at 110% 10%, rgba(25,195,177,.14), transparent 60%), var(--bg);
+  background-attachment: fixed; }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
+[hidden] { display: none !important; }
+.muted { color: var(--muted); } .small { font-size: 12px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* Kop */
+header.kop { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px clamp(16px, 2.4vw, 28px); background: color-mix(in srgb, var(--bg) 74%, transparent);
+  backdrop-filter: saturate(1.6) blur(18px); -webkit-backdrop-filter: saturate(1.6) blur(18px); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; color: #fff; flex: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 6px 18px rgba(109,94,252,.35); }
+.brand h1 { font-size: 18px; font-weight: 700; } .brand p { margin: 0; font-size: 12px; color: var(--muted); }
+.kop .acties { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Knoppen en velden */
+.btn { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--border); background: var(--surface-solid); color: var(--text); padding: 8px 14px;
+  border-radius: 12px; font-weight: 600; font-size: 13.5px; cursor: pointer; transition: transform .15s var(--ease), box-shadow .2s, background .2s; white-space: nowrap; }
+.btn:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.btn:disabled { opacity: .55; cursor: default; transform: none; box-shadow: none; }
+.btn.primary { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, var(--accent-2))); color: #fff; border-color: transparent; box-shadow: 0 6px 16px rgba(109,94,252,.28); }
+.btn.ghost { background: transparent; }
+.btn.sm { padding: 5px 10px; font-size: 12.5px; border-radius: 10px; gap: 5px; }
+.btn.sm svg { width: 14px; height: 14px; }
+.btn.wide { width: 100%; justify-content: center; padding: 11px 14px; font-size: 14.5px; }
+.icon-btn { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+.x { border: 0; background: none; color: var(--muted); cursor: pointer; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; }
+.x:hover { background: var(--danger-soft); color: var(--danger); }
+.x svg { width: 15px; height: 15px; }
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; min-width: 0; }
+.field, textarea { width: 100%; min-width: 0; background: var(--surface-solid); border: 1px solid var(--border-strong); border-radius: 10px; padding: 8px 10px; font-size: 14px; color: var(--text); }
+.field:focus-visible, textarea:focus-visible, .btn:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+textarea { height: 170px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; white-space: pre; resize: vertical; }
+input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; background: var(--sunken); padding: 1px 5px; border-radius: 6px; }
+
+/* Indeling */
+main.werk { display: grid; grid-template-columns: minmax(340px, 430px) minmax(0, 1fr); gap: 18px; padding: 18px clamp(16px, 2.4vw, 28px) 40px; align-items: start; }
+.zij { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 80px; max-height: calc(100vh - 96px); overflow: auto; padding-bottom: 6px; scrollbar-width: thin; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px;
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); min-width: 0; }
+.panel-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.panel-head h3 { font-size: 15px; } .panel-head p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.panel-head .rechts { margin-left: auto; display: flex; gap: 6px; }
+details.panel > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary h3 { font-size: 15px; } details.panel > summary p { margin: 2px 0 0; font-size: 12px; color: var(--muted); font-weight: 400; }
+details.panel > summary::after { content: ""; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .2s; }
+details.panel[open] > summary::after { transform: rotate(-135deg); }
+details.panel[open] > summary { margin-bottom: 12px; }
+
+table.rondes { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.rondes th { text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; padding: 0 3px 4px; }
+table.rondes td { padding: 2px 3px; }
+table.rondes .field { padding: 6px 7px; font-size: 13px; border-radius: 8px; }
+.groepen { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 600; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.chip.ghost { background: var(--sunken); color: var(--muted); }
+
+.meldingen { display: flex; flex-direction: column; gap: 6px; }
+.melding { padding: 9px 12px; border-radius: 12px; font-size: 13px; background: var(--danger-soft); color: var(--danger); }
+.melding.info { background: var(--accent-soft); color: var(--accent); }
+.melding.ok { background: var(--ok-soft); color: var(--ok); }
+.melding.warn { background: var(--warn-soft); color: var(--warn); }
+
+/* Resultaat */
+.uit { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); }
+.kpi b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.kpi span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.kpi.warn b { color: var(--warn); } .kpi.bad b { color: var(--danger); }
+.balk { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.leeg-start { text-align: center; padding: 48px 20px; color: var(--muted); }
+.leeg-start .logo { margin: 0 auto 14px; width: 52px; height: 52px; border-radius: 16px; }
+.leeg-start .logo svg { width: 26px; height: 26px; }
+
+.ronde { padding: 0; overflow: hidden; }
+.ronde > .rkop { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 18px; }
+.ronde > .rkop .tijd { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); min-width: 58px; }
+.ronde > .rkop h2 { font-size: 15.5px; }
+.ronde > .rkop p { margin: 1px 0 0; font-size: 12.5px; color: var(--muted); }
+.ronde > .rkop .knoppen { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.ronde.leeg > .rkop { opacity: .55; padding: 10px 18px; }
+.ronde.leeg > .rkop .tijd { font-size: 15px; }
+.ronde.cito { border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+.ronde.cito > .rkop .tijd { color: var(--danger); }
+.ronde.verstuurd > .rkop .tijd::after { content: "✓"; font-size: 13px; color: var(--ok); margin-left: 6px; vertical-align: 3px; }
+.mw { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 18px; background: var(--sunken); border-top: 1px solid var(--border); font-size: 13px; }
+.mw b { color: var(--accent); }
+.mw .knoppen { margin-left: auto; }
+.afd { border-top: 1px solid var(--border); }
+.afd .akop { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 10px 18px 6px; }
+.afd .akop b { font-size: 14px; } .afd .akop .meta { font-size: 12px; color: var(--muted); }
+.afd .akop .knoppen { margin-left: auto; }
+.tabelrol { overflow-x: auto; }
+table.orders { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+table.orders th { text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; padding: 4px 10px; }
+table.orders td { padding: 8px 10px; border-top: 1px solid var(--border); vertical-align: top; }
+table.orders td:first-child { padding-left: 18px; white-space: nowrap; } table.orders td:last-child { padding-right: 18px; }
+table.orders tr.iso td { background: var(--danger-soft); }
+table.orders .sub { font-size: 11.5px; color: var(--muted); }
+.st { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.st-cito { background: var(--danger-soft); color: var(--danger); } .st-nuchter { background: var(--warn-soft); color: var(--warn); } .st-normaal { background: var(--accent-soft); color: var(--accent); }
+.cond { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; margin: 0 4px 3px 0; }
+.c-isolatie { background: var(--danger); color: #fff; } .c-arm { background: var(--arm-soft); color: var(--arm); } .c-let-op { background: var(--warn-soft); color: var(--warn); }
+
+.toasts { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 50; pointer-events: none; }
+.toast { background: var(--surface-solid); border: 1px solid var(--border); box-shadow: var(--shadow); border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 600; }
+.toast.bad { color: var(--danger); }
+
+@media (max-width: 960px) { main.werk { grid-template-columns: minmax(0, 1fr); } .zij { position: static; max-height: none; overflow: visible; } }
+@media (max-width: 520px) { .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kop .acties .btn span { display: none; } }
+@media print {
+  header.kop, .zij, .knoppen, .kpis, .balk, .toasts { display: none !important; }
+  body { background: #fff; color: #000; font-size: 11px; }
+  main.werk { display: block; padding: 0; }
+  .panel { box-shadow: none; backdrop-filter: none; border: 0; border-radius: 0; background: #fff; }
+  .ronde { page-break-after: always; } .ronde.leeg { display: none; }
+  body.print-een .ronde:not(.printen) { display: none; }
+  .afd { break-inside: avoid; }
+  .st, .cond, tr.iso td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+<header class="kop">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6M12 8v4M10 10h4"/></svg></span>
+    <div><h1>Prikken in kliniek</h1><p>Alle klinische aanvragen per prikronde en afdeling</p></div>
+  </div>
+  <div class="acties">
+    <button class="btn" id="ophalen" type="button" title="Open klinische orders uit de werklijst van de afnamemodule ophalen"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Uit afnamemodule</span></button>
+    <button class="btn ghost" id="voorbeeld" type="button"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span>Voorbeeld</span></button>
+    <button class="icon-btn" id="thema" type="button" title="Licht/donker wisselen" aria-label="Thema wisselen"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  </div>
+</header>
+
+<main class="werk">
+<div class="zij">
+  <section class="panel">
+    <div class="panel-head"><div><h3>Aanvragen</h3><p>Eén per regel, of plak uit Excel/CSV met kopregel</p></div></div>
+    <textarea id="aanvragen" spellcheck="false" placeholder="afdeling; kamer; bed; ordernummer; patientnummer; naam; geboortedatum; status; bepalingen; ronde; bijzonderheden
+C3; 12; 2; A26-104231; 4100123; Mw. Bakker; 01-02-1950; nuchter; Glucose nuchter; ; Alleen linkerarm
+B3; 3; 1; A26-104232; 4100456; Dhr. Jansen; 03-04-1960; cito; Troponine
+C5; 5; 3; A26-104233; 4100789; Dhr. Smit; 12-11-1948; normaal; CRP; 14:00; Patiënt in quarantaine"></textarea>
+    <p class="hint">Status <b>cito</b>, <b>nuchter</b> of <b>normaal</b>. Ronde: leeg (eerstvolgende), een tijdstip (<code>14:00</code>), een rondenaam of naam + tijd. Bijzonderheden als <i>alleen linkerarm</i>, <i>shunt</i> of <i>isolatie/quarantaine</i> worden herkend en gemarkeerd.</p>
+    <div class="grid3" style="margin-top:12px">
+      <label class="f">Indelen vanaf<input class="field" id="vanaf" type="time" value="00:00"></label>
+      <label class="f">Marge (min)<input class="field" id="marge" type="number" min="0" max="240" value="30"></label>
+      <label class="f">Min. per afname<input class="field" id="duur" type="number" min="1" max="60" value="5"></label>
+    </div>
+    <p class="hint">Rondes vóór "Indelen vanaf" zijn al geweest. Met een gewenst tijdstip gaat een aanvraag naar de eerste ronde die hooguit <i>marge</i> minuten eerder begint.</p>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+      <label class="btn sm ghost" style="cursor:pointer"><svg viewBox="0 0 24 24"><path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></svg>CSV-bestand<input id="csv" type="file" accept=".csv,.txt,.tsv" hidden></label>
+      <button class="btn sm ghost" id="wis" type="button">Leegmaken</button>
+    </div>
+    <div style="margin-top:12px"><button class="btn primary wide" id="indelen" type="button"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h6"/></svg>Indelen per ronde en afdeling</button></div>
+  </section>
+
+  <div class="meldingen" id="meldingen"></div>
+
+  <details class="panel" id="pRondes">
+    <summary><div><h3>Prikrondes</h3><p id="rondesSub">Instelbaar: tijd, groepen, medewerkers</p></div></summary>
+    <table class="rondes"><thead><tr><th>Naam</th><th style="width:84px">Start</th><th>Groepen</th><th style="width:52px" title="Aantal medewerkers">Mw.</th><th style="width:30px" title="Nuchtere afnames gaan naar deze ronde">Nu.</th><th style="width:28px"></th></tr></thead>
+      <tbody id="rondes"></tbody></table>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn sm" id="rondeErbij" type="button">+ Ronde</button>
+      <button class="btn sm ghost" id="rondesStandaard" type="button">Standaard herstellen</button>
+    </div>
+    <p class="hint">Standaard: IC-prikronde om 06:00 en klinische prikrondes om 07, 08, 10, 12, 14, 16, 18, 20 en 22 uur. <i>Groepen</i>: afdelingsgroepen die de ronde bedient (komma-gescheiden) of <i>alle</i>. <i>Mw.</i>: medewerkers; de afdelingen worden in loopvolgorde over hen verdeeld, een afdeling wordt nooit gesplitst. <i>Nu.</i>: nuchtere afnames gaan naar deze ronde.</p>
+  </details>
+
+  <details class="panel" id="pAfd">
+    <summary><div><h3>Afdelingen en groepen</h3><p id="afdSub">Groepering bepaalt welke ronde langs welke afdeling gaat</p></div></summary>
+    <label class="f">Eén per regel: <code>code; naam; groep; gebouw; verdieping</code><textarea id="afdelingen" spellcheck="false" style="height:200px"></textarea></label>
+    <div class="groepen" id="groepen"></div>
+    <p class="hint">Gebouw en verdieping bepalen de loopvolgorde vanaf de prikpost. De afdelingsnaam wordt ook gebruikt om de locatie van orders uit de afnamemodule te herkennen.</p>
+    <div class="grid2" style="margin-top:10px">
+      <label class="f">Prikpost / lab: gebouw<input class="field" id="postGebouw" value="A"></label>
+      <label class="f">Verdieping<input class="field" id="postVerdieping" type="number" value="0"></label>
+    </div>
+  </details>
+</div>
+
+<section class="uit" id="uitvoer">
+  <div class="panel leeg-start" id="leeg">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6M12 8v4M10 10h4"/></svg></span>
+    <h3 style="color:var(--text)">Nog niets ingedeeld</h3>
+    <p style="margin:6px 0 0">Haal de open orders op uit de afnamemodule, plak ze links of laad het voorbeeld.<br>Klik daarna op <b>Indelen per ronde en afdeling</b>.</p>
+  </div>
+  <div class="kpis" id="kpis" hidden></div>
+  <div class="balk" id="balk" hidden>
+    <button class="btn primary" id="alleSturen" type="button"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Alles naar afnamemodule</button>
+    <button class="btn" id="alleJson" type="button">FHIR + routes (JSON)</button>
+    <button class="btn" id="alleCsv" type="button">CSV</button>
+    <button class="btn" id="alleAfdrukken" type="button">Afdrukken</button>
+    <span class="muted small" id="balkInfo"></span>
+  </div>
+  <div id="resultaat" class="uit"></div>
+</section>
+</main>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>/* Module "Prikken in kliniek": deelt alle openstaande aanvragen op de verpleegafdelingen in
+ * per prikronde en per afdeling.
+ *
+ * - Afdelingen horen bij een instelbare groep (bijv. IC, Klinisch); een prikronde bedient één of
+ *   meer groepen. Zo loopt de IC-ronde om 06:00 alleen langs de IC.
+ * - Elke aanvraag valt in één prikronde (of in "Direct prikken" bij CITO).
+ * - Binnen een ronde staan de afdelingen per groep in loopvolgorde vanaf de prikpost
+ *   (gebouw/verdieping), binnen een afdeling de aanvragen op kamer en bed.
+ * - Heeft een ronde meer medewerkers, dan worden de afdelingen (nooit een afdeling gesplitst)
+ *   in loopvolgorde over de medewerkers verdeeld met een zo gelijk mogelijke werklast.
+ *
+ * Werkt in de browser (window.Kliniek) en in Node (require) voor de tests.
+ */
+(function (root) {
+  "use strict";
+
+  const STANDAARD_LOOP = {
+    afdeling: 2,      // min: afdeling verlaten en de volgende binnenlopen
+    verdieping: 0.5,  // min per verdieping verschil
+    lift: 1,          // min wachten op de lift zodra je van verdieping wisselt
+    gebouw: 3,        // min extra lopen naar een ander gebouw/vleugel
+  };
+
+  const min = s => { const [h, m] = String(s).trim().split(":").map(Number); return h * 60 + m; };
+  const hhmm = m => { m = Math.round(m); m = ((m % 1440) + 1440) % 1440; return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; };
+  const TIJD = /^\d{1,2}[:.]\d{2}$/;
+  const STATUSSEN = ["cito", "nuchter", "normaal"];
+  const sleutel = s => String(s ?? "").trim().toUpperCase();
+  const velden = regel => regel.split(/[;\t]/).map(s => s.trim());
+  const tijd = s => min(s.replace(".", ":"));
+  // Natuurlijke sortering: kamer 2 vóór kamer 10, "B3.12" vóór "B3.2a" waar logisch
+  const natuurlijk = (a, b) => String(a).localeCompare(String(b), "nl", { numeric: true, sensitivity: "base" });
+
+  /** Afdelingen: één per regel "code; naam; groep; gebouw; verdieping" */
+  function parseAfdelingen(tekst) {
+    const afdelingen = {}, volgorde = [], groepen = [], fouten = [];
+    String(tekst || "").split(/\r?\n/).forEach((regel, i) => {
+      regel = regel.trim();
+      if (!regel || regel.startsWith("#")) return;
+      const d = velden(regel);
+      if (/^code$/i.test(d[0])) return; // kopregel
+      const verdieping = !d[4] ? 0 : Number(d[4].replace(",", "."));
+      if (!d[0] || !Number.isFinite(verdieping)) { fouten.push(`Afdelingen, regel ${i + 1}: code of verdieping onleesbaar`); return; }
+      if (afdelingen[sleutel(d[0])]) { fouten.push(`Afdelingen, regel ${i + 1}: afdeling ${d[0]} staat er dubbel in`); return; }
+      const groep = d[2] || "Klinisch";
+      if (!groepen.some(g => sleutel(g) === sleutel(groep))) groepen.push(groep);
+      afdelingen[sleutel(d[0])] = { code: d[0], naam: d[1] || d[0], groep: groepen.find(g => sleutel(g) === sleutel(groep)),
+                                    gebouw: sleutel(d[3]), verdieping, index: volgorde.length };
+      volgorde.push(sleutel(d[0]));
+    });
+    return { afdelingen, groepen, fouten };
+  }
+
+  /** Prikrondes uit objecten {naam, start: "HH:MM", groepen: "IC, Klinisch" | "alle", medewerkers, nuchter: bool}
+   *  (de tabel in de pagina) of uit tekst: één per regel "naam; starttijd; groepen; medewerkers; nuchter". */
+  function parseRondes(invoer) {
+    const fouten = [], rondes = [];
+    const lijst = Array.isArray(invoer) ? invoer : String(invoer || "").split(/\r?\n/).map((regel, i) => {
+      regel = regel.trim();
+      if (!regel || regel.startsWith("#")) return null;
+      const d = velden(regel);
+      if (/^naam$/i.test(d[0])) return null;
+      return { naam: d[0], start: d[1], groepen: d[2], medewerkers: d[3], nuchter: /^(nuchter|ja|j|x|1|true)$/i.test(d[4] || ""), regel: i + 1 };
+    }).filter(Boolean);
+    lijst.forEach((r, i) => {
+      const waar = `Prikrondes, ${r.regel ? "regel " + r.regel : "ronde " + (i + 1)}`;
+      const naam = String(r.naam || "").trim(), t = String(r.start || "").trim();
+      if (!naam || !TIJD.test(t)) { fouten.push(`${waar}: naam of starttijd (HH:MM) ontbreekt`); return; }
+      const g = String(r.groepen ?? "").trim();
+      const groepen = /^(alle|\*)?$/i.test(g) ? null : g.split(",").map(x => x.trim()).filter(Boolean);
+      const mw = parseInt(r.medewerkers, 10);
+      rondes.push({ naam, start: tijd(t), groepen, medewerkers: Math.max(1, Math.min(20, mw > 0 ? mw : 1)), nuchter: !!r.nuchter });
+    });
+    rondes.sort((a, b) => a.start - b.start);
+    rondes.forEach(r => { r.id = `${r.naam} ${hhmm(r.start)}`; });
+    const dubbel = rondes.find((r, i) => rondes.findIndex(x => x.id === r.id) !== i);
+    if (dubbel) fouten.push(`Prikrondes: ${dubbel.id} staat er dubbel in`);
+    return { rondes, fouten };
+  }
+
+  /* Aanvragen (orders). Kolommen worden herkend aan de kopregel (in elke volgorde, ook plakken uit Excel);
+   * zonder kopregel geldt de standaardvolgorde KOLOMMEN. */
+  const KOLOMMEN = ["afdeling", "kamer", "bed", "ordernummer", "patientnummer", "naam", "geboortedatum", "status", "bepalingen", "ronde", "bijzonderheden"];
+  const KOP = {
+    afdeling: /^(afdeling|afd|unit|verpleegafdeling)$/,
+    kamer: /^(kamer|kamernummer|kamernr)$/,
+    bed: /^(bed|bednummer|bednr)$/,
+    ordernummer: /^(order|ordernummer|ordernr|aanvraag|aanvraagnummer|aanvraagnr|labnummer)$/,
+    patientnummer: /^(patientnummer|patientnr|patnr|patient-?id|ziekenhuisnummer|zisnummer|zis)$/,
+    naam: /^(naam|patient|patientnaam)$/,
+    geboortedatum: /^(geboortedatum|geb\.?datum|gebdatum|geboren|dob)$/,
+    status: /^(status|prioriteit|urgentie)$/,
+    bepalingen: /^(bepalingen|bepaling|test|tests|onderzoek|onderzoeken|buizen)$/,
+    ronde: /^(ronde|prikronde|tijd|tijdstip|gewenst|gewenste ?tijd|afnametijd|gewenst tijdstip)$/,
+    bijzonderheden: /^(bijzonderheden|condities|speciale condities|opmerking|opmerkingen|instructies|bijz\.?)$/,
+  };
+  const kopNaam = x => String(x).trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  /* Speciale condities die de prikker vooraf moet zien. Herkend in de bijzonderheden (vrije tekst). */
+  const CONDITIES = [
+    { soort: "isolatie", label: "Isolatie", re: /(quarantaine|karantaine|carantaine|isolatie|geïsoleerd|geisoleerd|contactisolatie|druppelisolatie|aerogeen|strikte isolatie|mrsa|brmo|vre|covid|corona|norovirus|clostridi)/i },
+    { soort: "arm", label: "Arm", re: /(linker ?arm|rechter ?arm|links prikken|rechts prikken|niet (links|rechts)|alleen (links|rechts)|(linker|rechter)arm)/i },
+    { soort: "let-op", label: "Let op", re: /(shunt|fistel|lymfoedeem|okselklier|mammaca|infuus|picc|moeilijk prikbaar|vaatarm|kinderprikker|latex|flauwvallen|angst|agressie|valgevaar|dementie|delier|tolk)/i },
+  ];
+  function condities(tekst) {
+    return CONDITIES.filter(c => c.re.test(tekst || "")).map(c => ({ soort: c.soort, label: c.label }));
+  }
+
+  function parseAanvragen(tekst, afdelingen, rondes) {
+    const aanvragen = [], fouten = [];
+    const rondeNamen = Object.fromEntries(rondes.map(r => [sleutel(r.naam), r.naam]));
+    let kolommen = KOLOMMEN;
+    String(tekst || "").split(/\r?\n/).forEach((regel, i) => {
+      if (!regel.trim() || regel.trim().startsWith("#")) return;
+      const d = velden(regel);
+      // Kopregel: bepaalt de kolomvolgorde voor de rest van de invoer
+      const kop = d.map(x => Object.keys(KOP).find(k => KOP[k].test(kopNaam(x))) || null);
+      if (kop.includes("afdeling") && kop.filter(Boolean).length >= 2) { kolommen = kop; return; }
+      const v = {};
+      kolommen.forEach((k, j) => { if (k && d[j] != null) v[k] = d[j]; });
+      // Extra kolommen achteraan horen bij de bijzonderheden
+      if (d.length > kolommen.length) v.bijzonderheden = [v.bijzonderheden, ...d.slice(kolommen.length)].filter(Boolean).join("; ");
+      const afd = afdelingen[sleutel(v.afdeling)];
+      if (!afd) { fouten.push(`Aanvragen, regel ${i + 1}: afdeling "${v.afdeling || ""}" staat niet in de afdelingenlijst`); return; }
+      const status = (v.status || "normaal").trim().toLowerCase();
+      if (!STATUSSEN.includes(status)) { fouten.push(`Aanvragen, regel ${i + 1}: onbekende status "${v.status}" (cito, nuchter of normaal)`); return; }
+      // Ronde/tijd: "14:00", "Klinische prikronde" of "Klinische prikronde 20:00"
+      let ronde = null, tijdstip = null;
+      const rt = String(v.ronde || "").trim();
+      if (rt) {
+        const m = rt.match(/^(.*?)\s*(\d{1,2}[:.]\d{2})$/);
+        const naamDeel = m ? m[1] : rt;
+        if (m) tijdstip = tijd(m[2]);
+        if (naamDeel) {
+          if (rondeNamen[sleutel(naamDeel)]) ronde = rondeNamen[sleutel(naamDeel)];
+          else { fouten.push(`Aanvragen, regel ${i + 1}: onbekende prikronde "${naamDeel}"`); return; }
+        }
+      }
+      const bijz = String(v.bijzonderheden || "").trim();
+      aanvragen.push({
+        id: `A${aanvragen.length + 1}`, regel: i + 1, afdeling: afd.code, kamer: (v.kamer || "").trim(), bed: (v.bed || "").trim(),
+        ordernummer: (v.ordernummer || "").trim(), patientnummer: (v.patientnummer || "").trim(), patient: (v.naam || "").trim(),
+        geboortedatum: (v.geboortedatum || "").trim(), status, bepalingen: (v.bepalingen || "").trim(),
+        ronde, tijd: tijdstip, bijzonderheden: bijz, condities: condities(bijz),
+      });
+    });
+    return { aanvragen, fouten };
+  }
+
+  const bedient = (r, groep) => !r.groepen || r.groepen.some(g => sleutel(g) === sleutel(groep));
+
+  /** Kiest de prikronde voor één aanvraag. Geeft {ronde: id|null, cito?, reden} terug.
+   *  groep = afdelingsgroep van de aanvraag; alleen rondes die die groep bedienen tellen mee. */
+  function kiesRonde(a, rondes, { vanaf = 0, marge = 30, groep = null } = {}) {
+    if (a.status === "cito" && !a.ronde) return { ronde: null, cito: true, reden: "CITO: direct prikken" };
+    let open = rondes.filter(r => r.start >= vanaf && (groep == null || bedient(r, groep)));
+    const waar = groep ? ` voor ${groep}` : "";
+    if (a.ronde) {
+      // Opgegeven rondenaam (eventueel met tijdstip): de eerstvolgende ronde met die naam
+      open = open.filter(r => sleutel(r.naam) === sleutel(a.ronde));
+      const r = a.tijd != null ? open.find(r => r.start >= a.tijd - marge) : open[0];
+      return r ? { ronde: r.id, reden: "ronde opgegeven" } : { ronde: null, reden: `geen ${a.ronde}${a.tijd != null ? " om " + hhmm(a.tijd) : ""} meer${waar}` };
+    }
+    if (a.tijd != null) {
+      // Eerste ronde die niet meer dan `marge` minuten vóór het gewenste tijdstip begint
+      const r = open.find(r => r.start >= a.tijd - marge);
+      return r ? { ronde: r.id, reden: `gewenst ${hhmm(a.tijd)}` } : { ronde: null, reden: `geen ronde meer na ${hhmm(a.tijd)}${waar}` };
+    }
+    if (a.status === "nuchter") {
+      const r = open.find(r => r.nuchter) || (open.some(r => r.nuchter) || rondes.some(r => r.nuchter && (groep == null || bedient(r, groep))) ? null : open[0]);
+      return r ? { ronde: r.id, reden: "nuchter" } : { ronde: null, reden: `geen nuchtere ronde meer vandaag${waar}` };
+    }
+    return open[0] ? { ronde: open[0].id, reden: "eerstvolgende ronde" } : { ronde: null, reden: `geen ronde meer vandaag${waar}` };
+  }
+
+  /** Looptijd (min) tussen twee afdelingen (of de prikpost) */
+  function looptijd(a, b, loop = STANDAARD_LOOP) {
+    if (a === b) return 0;
+    let t = loop.afdeling;
+    const dv = Math.abs((a.verdieping || 0) - (b.verdieping || 0));
+    if (dv) t += loop.lift + dv * loop.verdieping;
+    if (sleutel(a.gebouw) !== sleutel(b.gebouw)) t += loop.gebouw;
+    return t;
+  }
+
+  const padLengte = (pad, start, loop) => pad.reduce((s, x, i) => s + looptijd(i ? pad[i - 1] : start, x, loop), 0)
+    + (pad.length ? looptijd(pad[pad.length - 1], start, loop) : 0);
+
+  /** Loopvolgorde van afdelingen: dichtstbijzijnde eerst vanaf de prikpost, daarna 2-opt. Gelijke afstand: volgorde van de lijst. */
+  function loopvolgorde(afds, start, loop = STANDAARD_LOOP) {
+    const rest = afds.slice().sort((a, b) => a.index - b.index), pad = [];
+    let hier = start;
+    while (rest.length) {
+      let bi = 0;
+      for (let i = 1; i < rest.length; i++) if (looptijd(hier, rest[i], loop) < looptijd(hier, rest[bi], loop)) bi = i;
+      hier = rest.splice(bi, 1)[0];
+      pad.push(hier);
+    }
+    let beter = true, best = padLengte(pad, start, loop);
+    while (beter) {
+      beter = false;
+      for (let i = 0; i < pad.length - 1 && !beter; i++) for (let j = i + 1; j < pad.length && !beter; j++) {
+        const n = pad.slice(0, i).concat(pad.slice(i, j + 1).reverse(), pad.slice(j + 1));
+        const l = padLengte(n, start, loop);
+        if (l < best - 1e-9) { pad.splice(0, pad.length, ...n); best = l; beter = true; }
+      }
+    }
+    return pad;
+  }
+
+  /** Verdeelt een reeks blokken (afdelingen) in loopvolgorde over n medewerkers, zo gelijk mogelijk.
+   *  Exact via dynamisch programmeren: minimaliseer de zwaarste deelronde. */
+  function verdeel(gewichten, n) {
+    const m = gewichten.length;
+    n = Math.max(1, Math.min(n, m));
+    const pre = [0]; gewichten.forEach(g => pre.push(pre[pre.length - 1] + g));
+    const best = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(Infinity));
+    const knip = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+    best[0][0] = 0;
+    for (let k = 1; k <= n; k++) for (let j = k; j <= m; j++) for (let i = k - 1; i < j; i++) {
+      const v = Math.max(best[k - 1][i], pre[j] - pre[i]);
+      if (v < best[k][j]) { best[k][j] = v; knip[k][j] = i; }
+    }
+    const grenzen = []; let j = m;
+    for (let k = n; k >= 1; k--) { const i = knip[k][j]; grenzen.unshift([i, j]); j = i; }
+    return grenzen;
+  }
+
+  /**
+   * Hoofdfunctie. req = {
+   *   afdelingen (uit parseAfdelingen), rondes (uit parseRondes), aanvragen (uit parseAanvragen),
+   *   prikpost: {gebouw, verdieping}, vanaf: "HH:MM" (rondes vóór dit tijdstip zijn al geweest),
+   *   marge (min), duur (min per afname), loop? (looptijden)
+   * }
+   */
+  function deelIn(req) {
+    const loop = { ...STANDAARD_LOOP, ...(req.loop || {}) };
+    const duur = req.duur > 0 ? req.duur : 5;
+    const start = { gebouw: sleutel(req.prikpost?.gebouw), verdieping: +req.prikpost?.verdieping || 0, prikpost: true };
+    const vanaf = req.vanaf ? min(req.vanaf) : 0;
+    const per = new Map(req.rondes.map(r => [r.id, []]));
+    const cito = [], niet = [];
+    for (const a of req.aanvragen) {
+      const k = kiesRonde(a, req.rondes, { vanaf, marge: req.marge ?? 30, groep: req.afdelingen[sleutel(a.afdeling)].groep });
+      const x = { ...a, reden: k.reden };
+      if (k.cito) cito.push(x); else if (k.ronde) per.get(k.ronde).push(x); else niet.push(x);
+    }
+    const sorteer = (p, q) => natuurlijk(p.kamer, q.kamer) || natuurlijk(p.bed, q.bed) || p.regel - q.regel;
+    const groepeer = lijst => {
+      const g = new Map();
+      for (const a of lijst) { const s = sleutel(a.afdeling); if (!g.has(s)) g.set(s, []); g.get(s).push(a); }
+      return g;
+    };
+    const blok = (afd, lijst) => ({ afdeling: afd.code, naam: afd.naam, groep: afd.groep, gebouw: afd.gebouw, verdieping: afd.verdieping,
+      aanvragen: lijst.slice().sort(sorteer), aantal: lijst.length,
+      nuchter: lijst.filter(a => a.status === "nuchter").length, cito: lijst.filter(a => a.status === "cito").length });
+
+    // Per afdelingsgroep (volgorde van de afdelingenlijst) de afdelingen in loopvolgorde
+    const groepsvolgorde = afds => {
+      const gs = [...new Set(afds.slice().sort((a, b) => a.index - b.index).map(a => a.groep))];
+      return gs.flatMap(gr => loopvolgorde(afds.filter(a => a.groep === gr), start, loop));
+    };
+    const rondes = req.rondes.map(r => {
+      const lijst = per.get(r.id);
+      const g = groepeer(lijst);
+      const pad = groepsvolgorde([...g.keys()].map(s => req.afdelingen[s]));
+      const blokken = pad.map(afd => blok(afd, g.get(sleutel(afd.code))));
+      // Werklast per afdeling: afnames + looptijd naar de afdeling
+      const gewicht = blokken.map((b, i) => b.aantal * duur + looptijd(i ? pad[i - 1] : start, pad[i], loop));
+      const delen = blokken.length ? verdeel(gewicht, r.medewerkers) : [];
+      const medewerkers = delen.map(([i, j], k) => {
+        const deel = blokken.slice(i, j);
+        let t = r.start, vorige = start;
+        for (const b of deel) {
+          const afd = req.afdelingen[sleutel(b.afdeling)];
+          t += looptijd(vorige, afd, loop);
+          b.aankomst = hhmm(t);
+          b.medewerker = k + 1;
+          b.aanvragen.forEach((a, ai) => { a.aankomst = hhmm(t + ai * duur); });
+          t += b.aantal * duur;
+          vorige = afd;
+        }
+        t += deel.length ? looptijd(vorige, start, loop) : 0;
+        return { medewerker: k + 1, afdelingen: deel, aantal: deel.reduce((s, b) => s + b.aantal, 0), klaar: hhmm(t), duur_min: Math.round(t - r.start) };
+      });
+      return { id: r.id, naam: r.naam, start: hhmm(r.start), groepen: r.groepen, nuchter: r.nuchter, medewerkers_gepland: r.medewerkers,
+               aantal: lijst.length, afdelingen: blokken, medewerkers };
+    });
+
+    const g = groepeer(cito);
+    const citoBlokken = groepsvolgorde([...g.keys()].map(s => req.afdelingen[s])).map(afd => blok(afd, g.get(sleutel(afd.code))));
+    const waarschuwingen = [];
+    if (niet.length) waarschuwingen.push(`${niet.length} aanvra${niet.length === 1 ? "ag past" : "gen passen"} in geen enkele ronde van vandaag.`);
+    for (const r of rondes) {
+      if (!r.aantal) continue;
+      const eigen = req.rondes.find(x => x.id === r.id);
+      const volgende = req.rondes.find(x => x.start > eigen.start && (!eigen.groepen || !x.groepen || x.groepen.some(gr => bedient(eigen, gr))));
+      const laat = r.medewerkers.filter(m => volgende && min(m.klaar) > volgende.start);
+      if (laat.length) {
+        const eind = laat.reduce((x, m) => (min(m.klaar) > min(x) ? m.klaar : x), laat[0].klaar);
+        waarschuwingen.push(`${r.id} loopt uit tot ca. ${eind}, na de start van ${volgende.id}` +
+          (laat.length < r.medewerkers.length ? ` (${laat.length} van ${r.medewerkers.length} medewerkers).` : `. Overweeg een extra medewerker.`));
+      }
+    }
+    return { rondes, cito: { aantal: cito.length, afdelingen: citoBlokken }, niet_ingedeeld: niet.sort(sorteer), waarschuwingen };
+  }
+
+  /* ---------- Doorsturen naar de afnamemodule ----------
+   * Formaat (JSON, versie 1):
+   * { bron: "prikken-in-kliniek", versie: 1, aangemaakt: ISO-tijd,
+   *   ronde: {naam, start} | null (CITO/losse afdeling), medewerker: n | null,
+   *   orders: [{ordernummer, patientnummer, naam, geboortedatum, afdeling, afdeling_naam, afdelingsgroep,
+   *             kamer, bed, status, bepalingen, bijzonderheden, condities: [..], ronde, ronde_start, medewerker}] }
+   * De link is <adres>#orders=<base64url van deze JSON>: de gegevens staan in de hash en gaan dus niet
+   * naar de webserver van de afnamemodule; die leest location.hash in de browser uit. */
+  function exportOrders(blokken, { ronde = null, medewerker = null } = {}) {
+    return blokken.flatMap(b => b.aanvragen.map(a => ({
+      ordernummer: a.ordernummer, patientnummer: a.patientnummer, naam: a.patient, geboortedatum: a.geboortedatum,
+      afdeling: b.afdeling, afdeling_naam: b.naam, afdelingsgroep: b.groep, kamer: a.kamer, bed: a.bed,
+      status: a.status, bepalingen: a.bepalingen, bijzonderheden: a.bijzonderheden, condities: a.condities.map(c => c.soort),
+      ronde: ronde ? ronde.naam : null, ronde_start: ronde ? ronde.start : null, medewerker: medewerker ?? b.medewerker ?? null,
+    })));
+  }
+
+  function bericht(blokken, opties = {}) {
+    const { ronde = null, medewerker = null } = opties;
+    return { bron: "prikken-in-kliniek", versie: 1, aangemaakt: new Date().toISOString(),
+             ronde: ronde ? { naam: ronde.naam, start: ronde.start } : null, medewerker, orders: exportOrders(blokken, opties) };
+  }
+
+  const CSV_KOLOMMEN = ["ronde", "ronde_start", "medewerker", "afdeling", "afdeling_naam", "afdelingsgroep", "kamer", "bed", "ordernummer",
+                        "patientnummer", "naam", "geboortedatum", "status", "bepalingen", "bijzonderheden", "condities"];
+  function naarCsv(orders) {
+    const cel = v => { v = Array.isArray(v) ? v.join(",") : String(v ?? ""); return /[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+    return [CSV_KOLOMMEN.join(";"), ...orders.map(o => CSV_KOLOMMEN.map(k => cel(o[k])).join(";"))].join("\r\n");
+  }
+
+  function base64url(tekst) {
+    const bytes = new TextEncoder().encode(tekst);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function leesBase64url(b64) {
+    const bin = atob(b64.replace(/-/g, "+").replace(/_/g, "/"));
+    return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+  }
+  function afnameLink(adres, ber) {
+    return `${String(adres).replace(/#.*$/, "")}#orders=${base64url(JSON.stringify(ber))}`;
+  }
+
+  /* ---------- Koppeling met de afnamemodule van het LIS ---------- */
+  // Bepalingen splitsen op "|" of op komma's buiten haakjes: "Nierfunctie (kreat, eGFR), CRP" -> 2 bepalingen
+  function splitsBepalingen(tekst) {
+    tekst = String(tekst || "").trim();
+    if (!tekst) return [];
+    if (tekst.includes("|")) return tekst.split("|").map(x => x.trim()).filter(Boolean);
+    const uit = []; let diep = 0, huidig = "";
+    for (const c of tekst) {
+      if (c === "(") diep++; else if (c === ")") diep = Math.max(0, diep - 1);
+      if (c === "," && !diep) { uit.push(huidig); huidig = ""; } else huidig += c;
+    }
+    uit.push(huidig);
+    return uit.map(x => x.trim()).filter(Boolean);
+  }
+  const isoDatum = d => { const m = String(d || "").trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/); return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : (/^\d{4}-\d{2}-\d{2}$/.test(String(d || "").trim()) ? String(d).trim() : ""); };
+  const dagTijd = (datum, t) => { const [h, m] = t.split(":").map(Number); const d = new Date(`${datum}T00:00:00`); d.setHours(h, m, 0, 0); return d.toISOString(); };
+  const vandaag = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+  const ordernr = (a, datum) => a.ordernummer || `KL-${datum.replace(/-/g, "")}-${a.id}`;
+  const locatie = (b, a) => [`Afdeling ${b.naam}`, a.kamer && `kamer ${a.kamer}`, a.bed && `bed ${a.bed}`].filter(Boolean).join(" · ");
+
+  /** Groepen {blokken, ronde, medewerker} -> FHIR transaction-bundle (Patient + ServiceRequest per bepaling) */
+  function fhirBundle(groepen, datum = vandaag()) {
+    const entry = [], patIds = new Map();
+    for (const g of groepen) for (const b of g.blokken) for (const a of b.aanvragen) {
+      const pid = "kl-" + (a.patientnummer || a.patient || a.id).replace(/[^\w-]+/g, "").toLowerCase();
+      if (!patIds.has(pid)) {
+        patIds.set(pid, true);
+        const bd = isoDatum(a.geboortedatum);
+        entry.push({ fullUrl: `urn:uuid:${pid}`, request: { method: "PUT", url: `Patient/${pid}` }, resource: { resourceType: "Patient", id: pid,
+          identifier: a.patientnummer ? [{ system: "urn:lis:patientnummer", value: a.patientnummer }] : [], name: [{ text: a.patient || "Onbekend" }], ...(bd ? { birthDate: bd } : {}) } });
+      }
+      const notities = [g.ronde ? `Prikronde: ${g.ronde.id}${g.medewerker ? " (medewerker " + g.medewerker + ")" : ""}` : "CITO: direct prikken",
+        a.status === "nuchter" ? "Nuchter afnemen" : null,
+        ...a.condities.map(c => `⚠ ${c.label}`),
+        a.bijzonderheden ? `Bijzonderheden: ${a.bijzonderheden}` : null].filter(Boolean).map(text => ({ text }));
+      const tests = [...new Set(a.tests && a.tests.length ? a.tests : splitsBepalingen(a.bepalingen))];
+      (tests.length ? tests : ["Bloedafname"]).forEach((t, i) => entry.push({ fullUrl: `urn:uuid:${a.id}-${i}`, request: { method: "POST", url: "ServiceRequest" }, resource: {
+        resourceType: "ServiceRequest", id: `${ordernr(a, datum)}-${i + 1}`, status: "active", intent: "order",
+        priority: a.status === "cito" ? "stat" : "routine",
+        requisition: { system: "urn:lis:aanvraag", value: ordernr(a, datum) },
+        code: { text: t }, subject: { reference: `Patient/${pid}`, display: a.patient },
+        locationCode: [{ text: locatie(b, a) }],
+        // Een gewenst tijdstip (bijv. dalspiegel) blijft leidend; anders de verwachte tijd in de ronde
+        ...(a.tijd != null ? { occurrenceDateTime: dagTijd(datum, hhmm(a.tijd)) } : g.ronde && a.aankomst ? { occurrenceDateTime: dagTijd(datum, a.aankomst) } : {}),
+        note: notities,
+        extension: [{ url: "urn:lis:kliniek", valueString: JSON.stringify({ afdeling: b.afdeling, kamer: a.kamer, bed: a.bed, ronde: g.ronde ? g.ronde.id : "CITO", condities: a.condities.map(c => c.soort) }) }],
+      } }));
+    }
+    return { resourceType: "Bundle", type: "transaction", timestamp: new Date().toISOString(), meta: { tag: [{ system: "urn:lis:bron", code: "prikken-in-kliniek" }] }, entry };
+  }
+
+  /** Groepen -> routes in het formaat dat de afnamemodule van een routeplanner verwacht */
+  function afnameRoutes(groepen, datum = vandaag()) {
+    return { routes: groepen.filter(g => g.blokken.some(b => b.aanvragen.length)).map(g => {
+      const stops = g.blokken.flatMap(b => b.aanvragen.map(a => ({ a, b })));
+      const naam = g.ronde ? `${g.ronde.id}${g.medewerker && g.aantalMw > 1 ? " · medewerker " + g.medewerker : ""}` : "Direct prikken (CITO)";
+      const id = `KL-${datum}-${(g.ronde ? g.ronde.id : "CITO").replace(/[^\w]+/g, "-")}${g.medewerker ? "-m" + g.medewerker : ""}`;
+      return { id, naam, gebied: [...new Set(stops.map(s => s.b.afdeling))].join(" → "), datum,
+        stops: stops.map((s, i) => ({ ordernummer: ordernr(s.a, datum), volgorde: i + 1, ...(s.a.aankomst ? { eta: dagTijd(datum, s.a.aankomst) } : {}) })),
+        afstandKm: 0, duurMin: g.duurMin ?? null };
+    }) };
+  }
+
+  /** Groepen voor een indeling: CITO apart, daarna per ronde per medewerker */
+  function groepenVan(res, { alleen = null } = {}) {
+    const g = [];
+    if (res.cito.aantal && (!alleen || alleen === "cito")) g.push({ blokken: res.cito.afdelingen, ronde: null });
+    res.rondes.forEach(r => { if (r.aantal && (!alleen || alleen === r.id)) r.medewerkers.forEach(m => g.push({ blokken: m.afdelingen, ronde: r, medewerker: m.medewerker, aantalMw: r.medewerkers.length, duurMin: m.duur_min })); });
+    return g;
+  }
+
+  /** Open orders uit de afnamemodule -> invoerregels voor deze module. Thuisprik en poli vallen af. */
+  function vanAfname(orders, catalogus, afdelingen) {
+    const lijst = Object.values(afdelingen);
+    const zoekAfd = loc => {
+      const kaal = String(loc || "").split(" · ")[0].replace(/^afdeling\s+/i, "").trim().toLowerCase();
+      return lijst.find(a => a.naam.toLowerCase() === kaal || a.code.toLowerCase() === kaal)
+          || lijst.find(a => kaal && (kaal.includes(a.naam.toLowerCase()) || a.naam.toLowerCase().includes(kaal)))
+          || lijst.find(a => new RegExp(`\\b${a.code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(kaal));
+    };
+    const tests = (catalogus && catalogus.tests) || {};
+    const datumNl = d => { const m = String(d || "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : d || ""; };
+    const regels = [KOLOMMEN.join("; ")], overgeslagen = [];
+    const schoon = x => String(x ?? "").replace(/[;\t\r\n]+/g, " ").trim();
+    for (const o of orders || []) {
+      if (["done", "failed", "cancelled"].includes(o.status) || o.status === "later") continue;
+      if (/thuis|poli/i.test(o.loc || "")) continue;
+      const afd = zoekAfd(o.loc);
+      if (!afd) { overgeslagen.push(`${o.req}: locatie "${o.loc}" niet in de afdelingenlijst`); continue; }
+      const kamer = (String(o.loc || "").match(/kamer\s+([^·]+)/i) || [])[1] || o.kamer || "";
+      const bed = (String(o.loc || "").match(/bed\s+([^·]+)/i) || [])[1] || o.bed || "";
+      const nuchter = (o.tests || []).some(t => ((tests[t.key] || {}).cond || []).includes("nuchter"));
+      const status = o.priority === "stat" ? "cito" : nuchter ? "nuchter" : "normaal";
+      let tijd = "";
+      if (o.due) { const d = new Date(o.due); if (!isNaN(d)) tijd = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
+      const note = String(o.note || "").split(" · ").filter(x => !/^(Prikronde:|CITO: direct|Nuchter afnemen|⚠ )/.test(x)).map(x => x.replace(/^Bijzonderheden:\s*/, "")).join(" · ");
+      regels.push([afd.code, kamer.trim(), bed.trim(), o.req, (o.patient || {}).mrn, (o.patient || {}).name, datumNl((o.patient || {}).dob), status,
+        (o.tests || []).map(t => schoon(t.name)).join(" | "), tijd, note].map(schoon).join("; "));
+    }
+    return { regels, overgeslagen };
+  }
+
+  // Voorbeeld: een fictief ziekenhuis met 3 gebouwen en een dag aan aanvragen
+  const VOORBEELD_AFDELINGEN = `code; naam; groep; gebouw; verdieping
+IC; Intensive Care; IC; A; 2
+SEH; Spoedeisende hulp; Klinisch; A; 0
+B2; Cardiologie B2; Klinisch; B; 2
+B3; Chirurgie B3; Klinisch; B; 3
+B4; Orthopedie B4; Klinisch; B; 4
+B5; Neurologie B5; Klinisch; B; 5
+C2; Kinderafdeling C2; Klinisch; C; 2
+C3; Interne C3; Klinisch; C; 3
+C5; Longziekten C5; Klinisch; C; 5
+C6; Oncologie C6; Klinisch; C; 6`;
+
+  // Standaard: IC-prikronde om 06:00, klinische prikrondes om 07, 08, 10, 12, 14, 16, 18, 20 en 22 uur
+  const STANDAARD_RONDES = [
+    { naam: "IC-prikronde", start: "06:00", groepen: "IC", medewerkers: 1, nuchter: true },
+    ...["07:00", "08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00"].map(t =>
+      ({ naam: "Klinische prikronde", start: t, groepen: "Klinisch", medewerkers: t === "07:00" ? 3 : 1, nuchter: t === "07:00" })),
+  ];
+  const rondesNaarTekst = lijst => ["naam; starttijd; groepen; medewerkers; nuchter",
+    ...lijst.map(r => `${r.naam}; ${r.start}; ${r.groepen || "alle"}; ${r.medewerkers}${r.nuchter ? "; nuchter" : ""}`)].join("\n");
+  const VOORBEELD_RONDES = rondesNaarTekst(STANDAARD_RONDES);
+
+  function voorbeeldAanvragen(aantal = 60, seed = 7) {
+    let s = seed;
+    const rng = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    const kies = l => l[Math.floor(rng() * l.length)];
+    const codes = VOORBEELD_AFDELINGEN.split("\n").slice(1).map(r => r.split(";")[0].trim());
+    const namen = ["Jansen", "de Vries", "Bakker", "Visser", "Smit", "Meijer", "de Boer", "Mulder", "de Groot", "Bos", "Vos", "Peters", "Hendriks", "van Dijk"];
+    // Namen zoals in de catalogus van de afnamemodule, zodat het materiaal (buis) direct bekend is
+    const bep = ["Bloedbeeld", "Nierfunctie | CRP", "CRP | BSE", "Glucose nuchter | HbA1c", "PT/INR en APTT", "Bloedkweek", "Bloedbeeld | hs-Troponine T", "Lipidenspectrum", "TSH en vrij T4", "Vancomycine dalspiegel | Nierfunctie"];
+    const bijz = ["", "", "", "", "", "", "Alleen linkerarm (shunt rechts)", "Niet rechts prikken: lymfoedeem", "Contactisolatie (MRSA)", "Patiënt in quarantaine", "Moeilijk prikbaar", "Druppelisolatie", "Latexallergie"];
+    const regels = [KOLOMMEN.join("; ")];
+    for (let i = 0; i < aantal; i++) {
+      const afd = kies(codes);
+      const r = rng();
+      const status = r < 0.05 ? "cito" : r < 0.45 ? "nuchter" : "normaal";
+      const kamer = String(Math.floor(rng() * 12) + 1), bed = String(Math.floor(rng() * 4) + 1);
+      const naam = `${rng() < 0.5 ? "Dhr." : "Mw."} ${kies(namen)}`;
+      const gd = `${String(1 + Math.floor(rng() * 28)).padStart(2, "0")}-${String(1 + Math.floor(rng() * 12)).padStart(2, "0")}-${1930 + Math.floor(rng() * 70)}`;
+      const t = status === "normaal" && rng() < 0.4 ? kies(["09:00", "10:30", "14:00", "15:30", "19:00", "21:30"]) : "";
+      regels.push([afd, kamer, bed, `L${String(2611020000 + i)}`, String(1000000 + Math.floor(rng() * 8999999)), naam, gd, status, kies(bep), t, kies(bijz)].join("; "));
+    }
+    return regels;
+  }
+
+  const api = { STANDAARD_LOOP, KOLOMMEN, condities, parseAfdelingen, parseRondes, parseAanvragen, kiesRonde, looptijd, loopvolgorde, verdeel, deelIn,
+                exportOrders, bericht, naarCsv, splitsBepalingen, fhirBundle, afnameRoutes, groepenVan, vanAfname, afnameLink, base64url, leesBase64url,
+                VOORBEELD_AFDELINGEN, STANDAARD_RONDES, VOORBEELD_RONDES, rondesNaarTekst, voorbeeldAanvragen, hhmm };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.Kliniek = api;
+})(this);
+</script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const K = window.Kliniek;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const inLIS = (() => { try { return parent !== window && !!parent.LISBUS; } catch { return false; } })();
+const IC = { stuur: '<path d="M5 12h14M13 6l6 6-6 6"/>', print: '<path d="M6 9V3h12v6M6 18H4v-6h16v6h-2"/><path d="M6 14h12v7H6z"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>' };
+const ic = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
+let laatste = null;
+
+function melding(tekst, soort = "") {
+  const div = document.createElement("div");
+  div.className = "melding" + (soort ? " " + soort : "");
+  div.textContent = tekst;
+  $("meldingen").appendChild(div);
+}
+function toast(tekst, slecht = false) {
+  const d = document.createElement("div"); d.className = "toast" + (slecht ? " bad" : ""); d.textContent = tekst;
+  $("toasts").appendChild(d); setTimeout(() => d.remove(), 4200);
+}
+
+/* ---------- Thema (in het LIS zet de shell het thema) ---------- */
+$("thema").hidden = inLIS;
+$("thema").onclick = () => {
+  const nu = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = nu === "dark" ? "light" : "dark";
+  try { localStorage.setItem("lis.theme", document.documentElement.dataset.theme); } catch { }
+};
+try { const t = localStorage.getItem("lis.theme"); if (t && !inLIS) document.documentElement.dataset.theme = t; } catch { }
+
+/* ---------- Rondes-tabel ---------- */
+function rondeRij(r = { naam: "Klinische prikronde", start: "", groepen: "Klinisch", medewerkers: 1, nuchter: false }) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td><input class="field" data-k="naam" value="${esc(r.naam)}" aria-label="Naam"></td><td><input class="field" data-k="start" type="time" value="${esc(r.start)}" aria-label="Starttijd"></td>
+    <td><input class="field" data-k="groepen" value="${esc(r.groepen || "alle")}" aria-label="Groepen"></td><td><input class="field" data-k="medewerkers" type="number" min="1" max="20" value="${esc(r.medewerkers)}" aria-label="Medewerkers"></td>
+    <td style="text-align:center"><input data-k="nuchter" type="checkbox" ${r.nuchter ? "checked" : ""} aria-label="Nuchtere ronde"></td>
+    <td><button type="button" class="x" title="Ronde verwijderen" aria-label="Ronde verwijderen">${ic("x")}</button></td>`;
+  tr.querySelector(".x").onclick = () => { tr.remove(); bewaar(); };
+  $("rondes").appendChild(tr);
+}
+function zetRondes(lijst) { $("rondes").innerHTML = ""; lijst.forEach(rondeRij); }
+function leesRondes() {
+  return [...$("rondes").rows].map(tr => Object.fromEntries([...tr.querySelectorAll("input")].map(i => [i.dataset.k, i.type === "checkbox" ? i.checked : i.value])));
+}
+$("rondeErbij").onclick = () => { rondeRij(); bewaar(); };
+$("rondesStandaard").onclick = () => { zetRondes(K.STANDAARD_RONDES); bewaar(); };
+
+/* ---------- Instellingen onthouden in deze browser ---------- */
+const BEWAAR = ["vanaf", "marge", "duur", "aanvragen", "afdelingen", "postGebouw", "postVerdieping"];
+const SLEUTEL = "lis.kliniek.invoer";
+function bewaar() {
+  try { const b = Object.fromEntries(BEWAAR.map(id => [id, $(id).value])); b.rondes = leesRondes(); localStorage.setItem(SLEUTEL, JSON.stringify(b)); } catch { /* geen opslag */ }
+  samenvattingInstellingen();
+}
+function herstel() {
+  let b = {};
+  try { b = JSON.parse(localStorage.getItem(SLEUTEL) || "{}") || {}; } catch { b = {}; }
+  BEWAAR.forEach(id => { if (b[id] != null) $(id).value = b[id]; });
+  if (!$("afdelingen").value.trim()) $("afdelingen").value = K.VOORBEELD_AFDELINGEN;
+  zetRondes(Array.isArray(b.rondes) && b.rondes.length ? b.rondes : K.STANDAARD_RONDES);
+  if (!b.vanaf) { const n = new Date(); $("vanaf").value = `${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`; }
+}
+$("uitvoer").addEventListener("input", e => e.stopPropagation());
+document.addEventListener("input", bewaar);
+document.addEventListener("change", bewaar);
+
+function samenvattingInstellingen() {
+  const { afdelingen, groepen } = K.parseAfdelingen($("afdelingen").value);
+  $("groepen").innerHTML = groepen.map(g => `<span class="chip">${esc(g)}</span><span class="muted small" style="align-self:center">${Object.values(afdelingen).filter(a => a.groep === g).map(a => esc(a.code)).join(", ")}</span>`).join("");
+  $("afdSub").textContent = `${Object.keys(afdelingen).length} afdelingen in ${groepen.length} groep${groepen.length === 1 ? "" : "en"}: ${groepen.join(", ")}`;
+  const r = leesRondes().filter(x => x.start);
+  $("rondesSub").textContent = r.length ? `${r.length} rondes · ${r.map(x => x.start).sort().join(", ")}` : "Nog geen rondes";
+}
+
+/* ---------- Invoer ---------- */
+$("voorbeeld").onclick = () => {
+  $("afdelingen").value = K.VOORBEELD_AFDELINGEN;
+  $("aanvragen").value = K.voorbeeldAanvragen(80).join("\n");
+  $("vanaf").value = "05:30";
+  bewaar(); $("meldingen").innerHTML = "";
+  melding("Voorbeeld geladen: 80 fictieve aanvragen over 10 afdelingen, indelen vanaf 05:30.", "info");
+  indelen();
+};
+$("wis").onclick = () => { $("aanvragen").value = ""; bewaar(); };
+$("csv").onchange = async e => { const f = e.target.files[0]; if (f) { $("aanvragen").value = (await f.text()).trim(); bewaar(); toast(`${f.name} ingelezen`); } e.target.value = ""; };
+
+async function afnameBron() {
+  if (inLIS && parent.LISBUS.kliniekBron) return parent.LISBUS.kliniekBron();
+  // Buiten het LIS-venster: dezelfde browseropslag als de afnamemodule (werkt als beide vanaf hetzelfde adres draaien)
+  const orders = JSON.parse(localStorage.getItem("lis.afname.orders") || "null");
+  if (!Array.isArray(orders)) throw new Error("geen afnamemodule gevonden in deze browser");
+  return { orders, catalog: JSON.parse(localStorage.getItem("lis.afname.catalog") || "null") };
+}
+$("ophalen").onclick = async () => {
+  $("meldingen").innerHTML = "";
+  const knop = $("ophalen"); knop.disabled = true;
+  try {
+    const { orders, catalog } = await afnameBron();
+    const A = K.parseAfdelingen($("afdelingen").value);
+    const { regels, overgeslagen } = K.vanAfname(orders, catalog, A.afdelingen);
+    if (regels.length <= 1) { melding("De afnamemodule heeft geen open orders voor klinische afdelingen.", "info"); return; }
+    $("aanvragen").value = regels.join("\n"); bewaar();
+    melding(`${regels.length - 1} open klinische order(s) opgehaald uit de afnamemodule. Vul waar nodig kamer en bed aan en klik op Indelen.`, "ok");
+    overgeslagen.forEach(x => melding(`Overgeslagen: ${x}. Voeg de afdeling toe onder Afdelingen en groepen.`));
+    indelen();
+  } catch (e) { melding(`Ophalen uit de afnamemodule lukte niet: ${e.message}. Gebruik plakken of een CSV-bestand.`); }
+  finally { knop.disabled = false; }
+};
+
+/* ---------- Indelen ---------- */
+function indelen() {
+  [...$("meldingen").querySelectorAll(".melding:not(.info):not(.ok)")].forEach(m => m.remove());
+  const A = K.parseAfdelingen($("afdelingen").value);
+  const R = K.parseRondes(leesRondes());
+  const fouten = [...A.fouten, ...R.fouten];
+  const groepen = new Set(A.groepen.map(g => g.toUpperCase()));
+  R.rondes.forEach(r => (r.groepen || []).forEach(g => { if (!groepen.has(g.toUpperCase())) fouten.push(`${r.id}: groep "${g}" bestaat niet in de afdelingenlijst`); }));
+  const V = K.parseAanvragen($("aanvragen").value, A.afdelingen, R.rondes);
+  fouten.push(...V.fouten);
+  fouten.forEach(f => melding(f));
+  if (!V.aanvragen.length) { if (!fouten.length) melding("Geen aanvragen om in te delen."); return; }
+  laatste = K.deelIn({
+    afdelingen: A.afdelingen, rondes: R.rondes, aanvragen: V.aanvragen,
+    prikpost: { gebouw: $("postGebouw").value, verdieping: +$("postVerdieping").value || 0 },
+    vanaf: $("vanaf").value || "00:00", marge: +$("marge").value || 0, duur: +$("duur").value || 5,
+  });
+  laatste.totaal = V.aanvragen.length;
+  laatste.waarschuwingen.forEach(w => melding(w, "warn"));
+  toon(laatste);
+}
+$("indelen").onclick = indelen;
+
+function orderTabel(lijst, metAfdeling = false) {
+  const rijen = lijst.map(a => `<tr class="${a.condities.some(c => c.soort === "isolatie") ? "iso" : ""}">
+      <td><b>${metAfdeling ? esc(a.afdeling) + " " : ""}${esc(a.kamer) || "–"}</b>${a.bed ? `<span class="muted">-${esc(a.bed)}</span>` : ""}${a.aankomst ? `<div class="sub">ca. ${a.aankomst}</div>` : ""}</td>
+      <td>${esc(a.patient) || "–"}<div class="sub">${[a.patientnummer && "pat. " + esc(a.patientnummer), a.geboortedatum && "geb. " + esc(a.geboortedatum)].filter(Boolean).join(" · ")}</div></td>
+      <td><span class="st st-${a.status}">${a.status}</span></td>
+      <td>${esc(a.bepalingen).replace(/ \| /g, ", ")}<div class="sub mono">${esc(a.ordernummer)}</div></td>
+      <td>${a.condities.map(c => `<span class="cond c-${c.soort}">${esc(c.label)}</span>`).join("")}${esc(a.bijzonderheden)}${a.reden && !["eerstvolgende ronde", "nuchter", "CITO: direct prikken"].includes(a.reden) ? `<div class="sub">${esc(a.reden)}</div>` : ""}</td></tr>`).join("");
+  return `<div class="tabelrol"><table class="orders"><thead><tr><th style="padding-left:18px">Kamer-bed</th><th>Patiënt</th><th>Status</th><th>Bepalingen · order</th><th>Bijzonderheden</th></tr></thead><tbody>${rijen}</tbody></table></div>`;
+}
+function afdelingBlok(b) {
+  const tel = [b.cito && `${b.cito} cito`, b.nuchter && `${b.nuchter} nuchter`].filter(Boolean).join(", ");
+  const iso = b.aanvragen.filter(a => a.condities.some(c => c.soort === "isolatie")).length;
+  return `<div class="afd"><div class="akop"><b>${esc(b.afdeling)} · ${esc(b.naam)}</b><span class="chip ghost">${esc(b.groep)}</span>
+      <span class="meta">gebouw ${esc(b.gebouw)}, verdieping ${esc(b.verdieping)} · ${b.aantal} aanvra${b.aantal === 1 ? "ag" : "gen"}${tel ? " (" + tel + ")" : ""}${b.aankomst ? " · vanaf ca. " + b.aankomst : ""}</span>
+      ${iso ? `<span class="cond c-isolatie">${iso}× isolatie</span>` : ""}</div>${orderTabel(b.aanvragen)}</div>`;
+}
+const meervoud = (n, een, veel) => `${n} ${n === 1 ? een : veel}`;
+
+function toon(res) {
+  $("leeg").hidden = true; $("kpis").hidden = false; $("balk").hidden = false;
+  const ingedeeld = res.rondes.reduce((n, r) => n + r.aantal, 0);
+  const alle = [res.cito.afdelingen, ...res.rondes.map(r => r.afdelingen)].flat().flatMap(b => b.aanvragen);
+  const iso = alle.filter(a => a.condities.some(c => c.soort === "isolatie")).length;
+  const cond = alle.filter(a => a.condities.length).length;
+  $("kpis").innerHTML = [["Aanvragen", res.totaal], ["In rondes", ingedeeld], ["CITO direct", res.cito.aantal, res.cito.aantal ? "bad" : ""],
+    ["Niet ingedeeld", res.niet_ingedeeld.length, res.niet_ingedeeld.length ? "warn" : ""], ["Met bijzonderheden", cond], ["Isolatie", iso, iso ? "bad" : ""],
+    ["Rondes", res.rondes.filter(r => r.aantal).length]]
+    .map(([t, n, c]) => `<div class="kpi ${c || ""}"><b>${n}</b><span>${t}</span></div>`).join("");
+  $("balkInfo").textContent = inLIS ? "Elke ronde per medewerker wordt een route in de afnamemodule." : "";
+  let html = "";
+  if (res.cito.aantal) {
+    html += `<section class="panel ronde cito" data-ronde="cito"><div class="rkop"><span class="tijd">CITO</span><div><h2>Direct prikken</h2><p>${meervoud(res.cito.aantal, "aanvraag", "aanvragen")} · niet wachten op een ronde</p></div>
+      <span class="knoppen">${knoppen("cito")}</span></div>${res.cito.afdelingen.map(afdelingBlok).join("")}</section>`;
+  }
+  res.rondes.forEach(r => {
+    const groep = r.groepen ? r.groepen.join(", ") : "alle afdelingen";
+    if (!r.aantal) {
+      html += `<section class="panel ronde leeg"><div class="rkop"><span class="tijd">${esc(r.start)}</span><div><h2>${esc(r.naam)}</h2><p>${esc(groep)} · geen aanvragen</p></div></div></section>`;
+      return;
+    }
+    const nuchter = r.afdelingen.reduce((n, b) => n + b.nuchter, 0);
+    html += `<section class="panel ronde" data-ronde="${esc(r.id)}"><div class="rkop"><span class="tijd">${esc(r.start)}</span>
+      <div><h2>${esc(r.naam)}${r.nuchter ? ' <span class="st st-nuchter">nuchter</span>' : ""}</h2>
+      <p>${esc(groep)} · ${meervoud(r.aantal, "aanvraag", "aanvragen")}${nuchter ? `, ${nuchter} nuchter` : ""} · ${meervoud(r.afdelingen.length, "afdeling", "afdelingen")} · ${meervoud(r.medewerkers.length, "medewerker", "medewerkers")}</p></div>
+      <span class="knoppen">${knoppen(r.id)}</span></div>`;
+    r.medewerkers.forEach(m => {
+      if (r.medewerkers.length > 1)
+        html += `<div class="mw"><b>Medewerker ${m.medewerker}</b><span>${meervoud(m.aantal, "aanvraag", "aanvragen")} · ${m.afdelingen.map(b => esc(b.afdeling)).join(" → ")} · klaar ca. ${m.klaar}</span></div>`;
+      html += m.afdelingen.map(afdelingBlok).join("");
+    });
+    html += `</section>`;
+  });
+  if (res.niet_ingedeeld.length) {
+    html += `<section class="panel ronde"><div class="rkop"><span class="tijd" style="color:var(--warn)">!</span><div><h2>Niet ingedeeld</h2><p>${meervoud(res.niet_ingedeeld.length, "aanvraag", "aanvragen")} zonder passende ronde vandaag. Pas de rondes of "Indelen vanaf" aan.</p></div></div>
+      <div class="afd">${orderTabel(res.niet_ingedeeld, true)}</div></section>`;
+  }
+  $("resultaat").innerHTML = html;
+}
+function knoppen(sl) {
+  return `<button class="btn sm primary" data-stuur="${esc(sl)}" type="button">${ic("stuur")}Naar afnamemodule</button>` +
+         `<button class="btn sm" data-json="${esc(sl)}" type="button">JSON</button><button class="btn sm" data-csv="${esc(sl)}" type="button">CSV</button>` +
+         `<button class="btn sm" data-print="${esc(sl)}" type="button" title="Prikronde-lijst afdrukken">${ic("print")}</button>`;
+}
+
+/* ---------- Doorsturen naar de afnamemodule ---------- */
+const groepenVoor = sl => K.groepenVan(laatste, { alleen: sl || null });
+async function stuur(sl) {
+  const groepen = groepenVoor(sl);
+  const bundle = K.fhirBundle(groepen), routes = K.afnameRoutes(groepen);
+  const n = groepen.reduce((s, g) => s + g.blokken.reduce((t, b) => t + b.aantal, 0), 0);
+  if (!n) { toast("Geen orders om door te sturen", true); return; }
+  let res = null;
+  try {
+    if (inLIS && parent.LISBUS.toAfname) res = await parent.LISBUS.toAfname(bundle, routes);
+    else {
+      const bc = new BroadcastChannel("lis-fhir");
+      bc.postMessage({ type: "kliniek", bundle, routes }); bc.postMessage({ type: "orders", bundle }); bc.close();
+    }
+  } catch (e) { toast(`Doorsturen mislukt: ${e.message}`, true); return; }
+  const doel = sl ? (sl === "cito" ? "CITO" : sl) : "alle rondes";
+  const tekst = res ? `${meervoud(n, "order", "orders")} (${doel}) in de afnamemodule: ${res.nieuw} nieuw, ${res.bijgewerkt} bijgewerkt, ${meervoud(res.routes, "route", "routes")}`
+    : `${meervoud(n, "order", "orders")} (${doel}) verstuurd naar een geopende afnamemodule in deze browser. Geen afnamemodule open? Gebruik JSON.`;
+  toast(tekst); melding(tekst, "ok");
+  (sl ? [sl] : ["cito", ...laatste.rondes.map(r => r.id)]).forEach(x => document.querySelector(`.ronde[data-ronde="${CSS.escape(x)}"]`)?.classList.add("verstuurd"));
+}
+function download(sl, soort) {
+  const groepen = groepenVoor(sl), naam = `prikken-kliniek-${(sl || "alle-rondes").replace(/[^\w-]+/g, "-").toLowerCase()}`;
+  const orders = groepen.flatMap(g => K.exportOrders(g.blokken, { ronde: g.ronde, medewerker: g.medewerker ?? null }));
+  const inhoud = soort === "json" ? JSON.stringify({ ...K.fhirBundle(groepen), routes: K.afnameRoutes(groepen).routes }, null, 2) : "﻿" + K.naarCsv(orders);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([inhoud], { type: soort === "json" ? "application/fhir+json" : "text/csv;charset=utf-8" }));
+  a.download = `${naam}.${soort}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$("alleSturen").onclick = () => stuur(null);
+$("alleJson").onclick = () => download(null, "json");
+$("alleCsv").onclick = () => download(null, "csv");
+$("alleAfdrukken").onclick = () => { document.body.classList.remove("print-een"); window.print(); };
+$("resultaat").addEventListener("click", e => {
+  const k = e.target.closest("button"); if (!k) return;
+  const d = k.dataset;
+  if (d.stuur) stuur(d.stuur);
+  else if (d.json) download(d.json, "json");
+  else if (d.csv) download(d.csv, "csv");
+  else if (d.print) {
+    document.querySelectorAll(".ronde.printen").forEach(x => x.classList.remove("printen"));
+    k.closest(".ronde").classList.add("printen"); document.body.classList.add("print-een"); window.print();
+  }
+});
+window.addEventListener("afterprint", () => document.body.classList.remove("print-een"));
+
+/* ---------- Start ---------- */
+herstel();
+samenvattingInstellingen();
+if (!inLIS) $("ophalen").title = "Leest de werklijst van de afnamemodule uit deze browser (zelfde adres als het LIS)";
+// Aanvragen via een link: #aanvragen=<base64url, UTF-8 tekst>
+(function () {
+  const h = new URLSearchParams(location.hash.slice(1)), b64 = h.get("aanvragen");
+  if (!b64) return;
+  try { $("aanvragen").value = K.leesBase64url(b64).trim(); bewaar(); melding("Aanvragen ontvangen via de link.", "info"); indelen(); }
+  catch (e) { melding("De aanvragen in de link konden niet worden gelezen: " + e.message); }
+  try { history.replaceState(null, "", location.pathname + location.search); } catch { }
+})();
+if ($("aanvragen").value.trim()) indelen();
+window.KLINIEK = { ready: true, indelen, ophalen: () => $("ophalen").click() };
+</script>
+</body>
+</html>
