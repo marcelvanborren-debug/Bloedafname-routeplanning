@@ -39,6 +39,30 @@ Alle gewichten en tijden zijn in de UI aan te passen onder *Prioriteiten en inst
    Opnieuw bouwen na wijzigingen: `python embedded/build.py`. Tests: `node embedded/solver.test.js`.
 2. **Server (FastAPI + Google OR-Tools)**: zie hieronder. Geschikt voor grotere aantallen en integratie via de API.
 
+## Module: Prikken in kliniek (`docs/kliniek.html`)
+
+Deelt alle aanvragen die op de klinische afdelingen geprikt moeten worden in **per prikronde en per afdeling**.
+Eén zelfstandig bestand, geen server of externe diensten nodig.
+
+* **Prikrondes instelbaar** (toevoegen, verwijderen, tijd, medewerkers). Standaard: IC-prikronde om 06:00 en klinische
+  prikrondes om 07, 08, 10, 12, 14, 16, 18, 20 en 22 uur.
+* **Afdelingsgroepen instelbaar** (`code; naam; groep; gebouw; verdieping`). Een ronde bedient één of meer groepen,
+  zo gaat de IC-ronde alleen langs de IC.
+* Indeling: CITO apart (direct prikken), opgegeven ronde of gewenst tijdstip (met marge), nuchter naar de nuchtere ronde,
+  verder de eerstvolgende ronde vanaf "Indelen vanaf". Binnen een ronde: afdelingen in loopvolgorde vanaf de prikpost,
+  aanvragen op kamer en bed; bij meer medewerkers worden de afdelingen gelijk verdeeld (een afdeling wordt niet gesplitst).
+* Orders bevatten afdeling, kamer, bed, ordernummer, patiëntnummer, naam, geboortedatum, status, bepalingen en
+  bijzonderheden. **Speciale condities** worden herkend en gemarkeerd: arm (bijv. *alleen linkerarm*, *niet rechts*),
+  isolatie/quarantaine (ook MRSA, BRMO, druppel-/contactisolatie) en overige *let op* (shunt, lymfoedeem, moeilijk prikbaar, latex …).
+* Invoer: plakken uit Excel/CSV (kolommen herkend aan de kopregel), CSV-bestand, of *Uit afnamemodule*.
+* **Doorsturen naar de afnamemodule**: een FHIR-transactiebundel (Patient + ServiceRequest met locatie, prikronde en
+  bijzonderheden) en de rondes als routes (`{routes:[{id, naam, gebied, datum, stops:[{ordernummer, volgorde, eta}]}]}`),
+  zodat een medewerker een hele ronde kan toe-eigenen. Ook als JSON en CSV te downloaden, en per ronde af te drukken.
+
+Inbouwen in het LIS-bestand (als module naast de afnamemodule, met de koppeling):
+`python embedded/build.py && python embedded/lis_inbouwen.py LIS-new2.html docs/kliniek.html LIS-new2-kliniek.html`.
+Tests: `node embedded/kliniek.test.js`.
+
 ## Online zetten met GitHub Pages
 
 Settings → Pages → *Deploy from a branch* → branch `main`, map `/docs`. De planner staat dan op
